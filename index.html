@@ -47,7 +47,10 @@
   /* Texto */
   --texto:        #FFFFFF;
   --texto-suave:  #9FB2C7;
-  --texto-fraco:  #6B8099;
+  /* Subido de #6B8099 para passar AA (4.5) mesmo sobre a superfície mais
+     clara. Num ecrã de exterior os mínimos da norma são o piso, não a meta:
+     a luz do sol reduz o contraste efetivo. */
+  --texto-fraco:  #8DA2B8;
 
   /* Semântica */
   --ok:      #34D399;
@@ -261,10 +264,12 @@ html, body {
 .acess-botao[aria-pressed="true"] { border-color: var(--tub-azul); color: var(--texto); }
 
 /* ---------- Ecrãs secundários ---------- */
+/* Alvo de 150 px ≈ 94 mm no ecrã real, acima do mínimo definido para
+   alvos táteis. É o botão mais usado de todos. */
 .voltar {
   display: flex; align-items: center; gap: var(--e2);
   margin: var(--e3) var(--e5) 0;
-  min-height: 110px; padding: 0 var(--e4);
+  min-height: 150px; padding: 0 var(--e4);
   background: var(--elevado); border: none; border-radius: var(--raio);
   color: var(--texto); font-family: inherit; font-size: var(--t-peq);
   cursor: pointer;
@@ -555,7 +560,272 @@ html, body {
 .legenda-marca { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; }
 .legenda-marca.aqui    { background: var(--tub-vermelho); border: 3px solid #fff; }
 .legenda-marca.paragem { background: var(--fundo); border: 3px solid #fff; }
+.legenda-item.sem-dados { color: var(--aviso); }
+.legenda-marca.vazia   { background: transparent; border: 3px dashed var(--aviso); }
 .legenda-marca.bus     { background: var(--tub-azul); border-radius: 6px; width: 34px; height: 22px; }
+
+/* ---------- Horários e percursos ---------- */
+.titulo-ecra { font-size: var(--t-med); font-weight: 600; margin-bottom: var(--e3); }
+
+.pesquisa {
+  width: 100%; min-height: 120px;
+  display: flex; align-items: center; gap: var(--e3);
+  background: var(--superficie); border: 2px solid var(--linha); border-radius: var(--raio);
+  padding: 0 var(--e4);
+  color: var(--texto); font-family: inherit; font-size: var(--t-peq);
+  text-align: left; cursor: pointer;
+}
+.pesquisa.ativa { border-color: var(--tub-azul); }
+.pesquisa-icone svg { width: 44px; height: 44px; display: block; }
+.pesquisa-icone { display: inline-flex; flex-shrink: 0; color: var(--texto-fraco); }
+.pesquisa-texto { flex: 1; }
+.pesquisa-texto.vazio { color: var(--texto-fraco); }
+.pesquisa-limpar {
+  flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%;
+  background: var(--elevado);
+  display: flex; align-items: center; justify-content: center; font-size: 40px;
+}
+
+.teclado { margin-top: var(--e3); }
+.teclado-fila { display: flex; gap: var(--e2); margin-bottom: var(--e2); }
+.tecla {
+  flex: 1; min-height: 92px;
+  background: var(--elevado); border: none; border-radius: 12px;
+  color: var(--texto); font-family: inherit; font-size: var(--t-base); font-weight: 600;
+  cursor: pointer;
+}
+.tecla:active { background: var(--tub-azul); }
+/* Os dígitos destacam-se: são a via mais usada e a que se quer mais rápida. */
+.tecla.digito {
+  background: var(--superficie); border: 2px solid var(--tub-azul);
+  font-size: var(--t-med); font-weight: 700;
+}
+.tecla.larga { font-size: var(--t-micro); font-weight: 400; }
+
+.grelha-linhas {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2);
+  margin-top: var(--e3);
+}
+.cartao-linha {
+  display: flex; align-items: center; gap: var(--e3);
+  min-height: 150px; padding: var(--e3);
+  background: var(--superficie); border: none; border-radius: var(--raio);
+  color: var(--texto); font-family: inherit; text-align: left; cursor: pointer;
+}
+.cartao-linha:active { background: var(--elevado); }
+.cartao-linha-num {
+  flex-shrink: 0; min-width: 110px; padding: var(--e2);
+  border-radius: 12px; color: #fff;
+  font-size: var(--t-med); font-weight: 700; text-align: center;
+}
+.cartao-linha-num.grande { min-width: 130px; font-size: var(--t-gr); }
+.cartao-linha-txt { min-width: 0; }
+.cartao-linha-destino { display: block; font-size: var(--t-peq); font-weight: 600; }
+.cartao-linha-motivo { display: block; font-size: var(--t-micro); color: var(--texto-suave); margin-top: 4px; }
+.sem-resultados { font-size: var(--t-peq); color: var(--texto-fraco); padding: var(--e5) 0; text-align: center; }
+
+.linha-cabecalho {
+  display: flex; align-items: center; gap: var(--e3);
+  margin: var(--e3) var(--e5) 0;
+}
+.linha-sentido { flex: 1; min-width: 0; }
+.linha-de   { display: block; font-size: var(--t-micro); color: var(--texto-suave); }
+.linha-para { display: block; font-size: var(--t-base); font-weight: 600; }
+.inverter {
+  flex-shrink: 0; width: 110px; height: 110px;
+  background: var(--elevado); border: none; border-radius: var(--raio);
+  color: var(--texto); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.inverter svg { width: 52px; height: 52px; }
+
+.abas { display: flex; gap: var(--e2); margin: var(--e3) var(--e5) 0; }
+.aba {
+  flex: 1; min-height: 110px;
+  background: transparent; border: 2px solid var(--linha); border-radius: var(--raio);
+  color: var(--texto-suave); font-family: inherit; font-size: var(--t-micro);
+  cursor: pointer;
+}
+.aba.ativa { background: var(--tub-azul); border-color: var(--tub-azul); color: #fff; font-weight: 600; }
+
+.duas-colunas {
+  display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--e3);
+  margin: var(--e3) var(--e5);
+}
+.coluna-titulo {
+  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 2px;
+  color: var(--texto-fraco); margin-bottom: var(--e2);
+}
+
+/* Termómetro: a linha vertical é o traço da carreira; cada ponto uma paragem. */
+.termometro { list-style: none; position: relative; padding-left: 44px; }
+.termometro::before {
+  content: ""; position: absolute; left: 17px; top: 18px; bottom: 18px;
+  width: 8px; border-radius: 4px; background: var(--cor-linha);
+}
+.parada { position: relative; padding: var(--e2) 0; min-height: 76px; }
+.parada-ponto {
+  position: absolute; left: -34px; top: 24px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--fundo); border: 5px solid var(--cor-linha);
+}
+.parada.terminal .parada-ponto { width: 30px; height: 30px; left: -38px; top: 20px; background: var(--cor-linha); }
+.parada.aqui .parada-ponto {
+  width: 34px; height: 34px; left: -40px; top: 18px;
+  background: var(--tub-vermelho); border-color: #fff;
+}
+.parada-nome { font-size: var(--t-peq); line-height: 1.2; }
+.parada.terminal .parada-nome { font-weight: 700; }
+.parada.aqui .parada-nome { font-weight: 700; color: #fff; }
+.parada-aqui {
+  display: block; font-size: var(--t-nano); color: var(--tub-vermelho);
+  text-transform: uppercase; letter-spacing: 2px; margin-top: 2px;
+}
+
+/* Quadro horário no formato dos desdobráveis: hora à esquerda, minutos à direita. */
+/* Quadro horário no formato dos desdobráveis: hora à esquerda, minutos à
+   direita. A densidade é calculada para o pior caso — uma linha com serviço
+   das 6h às 23h dá 18 filas, que têm de caber sem corte nem deslocamento. */
+.quadro { width: 100%; border-collapse: collapse; }
+.quadro th {
+  width: 76px; text-align: left; vertical-align: top;
+  padding: 9px var(--e2) 9px 0;
+  font-size: var(--t-micro); font-weight: 700; color: var(--tub-azul);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 2px solid var(--linha);
+}
+.quadro td {
+  padding: 9px 0;
+  font-size: var(--t-micro); line-height: 1.35; letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 2px solid var(--linha);
+}
+/* A hora corrente ganha fundo e barra lateral; as horas passadas esbatem.
+   Evita obrigar o passageiro a percorrer o quadro à procura de onde está. */
+.quadro tr.agora th, .quadro tr.agora td { background: rgba(0,114,188,.20); }
+.quadro tr.agora th {
+  color: #fff; box-shadow: inset 5px 0 0 var(--tub-azul); padding-left: var(--e2);
+}
+.quadro tr.passada th { color: var(--texto-fraco); }
+.quadro tr.passada td { color: var(--texto-fraco); }
+.quadro .ido { color: var(--texto-fraco); }
+.quadro tr.agora .ido { color: var(--texto-suave); }
+
+.sem-servico { font-size: var(--t-peq); color: var(--texto-fraco); padding: var(--e4) 0; }
+
+/* ---------- Mapa: modos e seletor de rede ---------- */
+.modos-mapa { display: flex; gap: var(--e2); margin: var(--e3) var(--e5) 0; }
+.modo {
+  flex: 1; min-height: 110px;
+  background: transparent; border: 2px solid var(--linha); border-radius: var(--raio);
+  color: var(--texto-suave); font-family: inherit; font-size: var(--t-peq);
+  cursor: pointer;
+}
+.modo.ativo { background: var(--tub-azul); border-color: var(--tub-azul); color: #fff; font-weight: 600; }
+
+.seletor-linhas {
+  display: flex; flex-wrap: wrap; gap: var(--e2);
+  margin: var(--e3) var(--e5) 0;
+}
+.chip-linha {
+  min-width: 140px; min-height: 110px;
+  background: var(--superficie); border: 3px solid var(--linha); border-radius: var(--raio);
+  color: var(--texto); font-family: inherit; font-size: var(--t-med); font-weight: 700;
+  cursor: pointer;
+}
+.chip-linha.ativo { color: #fff; }
+
+.mapa-vazio {
+  margin: var(--e3) var(--e5);
+  padding: var(--e6) var(--e5);
+  background: var(--superficie); border-radius: var(--raio);
+  display: flex; flex-direction: column; align-items: center; gap: var(--e3);
+  text-align: center;
+}
+.mapa-vazio-icone svg { width: 120px; height: 120px; color: var(--texto-fraco); }
+.mapa-vazio p { font-size: var(--t-peq); color: var(--texto-suave); line-height: 1.4; max-width: 720px; }
+
+.linha-resumo {
+  display: flex; align-items: center; gap: var(--e3);
+  margin: var(--e3) var(--e5) 0;
+  padding: var(--e3);
+  background: var(--superficie);
+  border-left: 8px solid;
+}
+.linha-resumo-txt { flex: 1; min-width: 0; }
+.linha-resumo-terminais { display: block; font-size: var(--t-peq); font-weight: 600; }
+.linha-resumo-nota { display: block; font-size: var(--t-micro); color: var(--texto-suave); margin-top: 4px; }
+.ver-horario {
+  flex-shrink: 0; min-height: 96px; padding: 0 var(--e3);
+  background: var(--elevado); border: none; border-radius: var(--raio);
+  color: var(--texto); font-family: inherit; font-size: var(--t-micro); cursor: pointer;
+}
+
+/* Traçados das outras carreiras: presentes para dar contexto, apagados
+   para não competirem com a que está selecionada. */
+.rota.apagada  { stroke: #24344A; stroke-width: 6; opacity: .55; }
+.rota.destaque { stroke-width: 12; opacity: 1; }
+.paragem-linha { pointer-events: none; }
+
+/* ---------- Teclado numérico do seletor de rede ---------- */
+.numpad { margin: var(--e3) var(--e5) 0; }
+.numpad-mostrador {
+  min-height: 96px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--superficie); border: 2px solid var(--tub-azul); border-radius: var(--raio);
+  font-size: var(--t-med); font-weight: 700; letter-spacing: 6px;
+  margin-bottom: var(--e2);
+}
+.numpad-mostrador.vazio {
+  color: var(--texto-fraco); font-size: var(--t-micro);
+  font-weight: 400; letter-spacing: 2px; border-color: var(--linha);
+}
+.numpad-fila { display: flex; gap: var(--e2); margin-bottom: var(--e2); }
+.tecla-num {
+  flex: 1; min-height: 86px;
+  background: var(--elevado); border: none; border-radius: 12px;
+  color: var(--texto); font-family: inherit; font-size: var(--t-base); font-weight: 700;
+  cursor: pointer;
+}
+.tecla-num:active { background: var(--tub-azul); }
+.tecla-num.acao { font-size: var(--t-micro); font-weight: 400; color: var(--texto-suave); }
+
+/* ---------- Lojas e pontos de venda ---------- */
+.lojas { margin-top: var(--e3); }
+.loja {
+  display: flex; gap: var(--e3); align-items: flex-start;
+  padding: var(--e3) 0;
+  border-bottom: 2px solid var(--linha);
+}
+.loja:last-child { border-bottom: none; }
+.loja-icone { flex-shrink: 0; display: inline-flex; color: var(--tub-azul); }
+.loja-icone svg { width: 52px; height: 52px; display: block; }
+.loja-txt { flex: 1; min-width: 0; }
+.loja-nome    { font-size: var(--t-peq); font-weight: 600; }
+.loja-morada  { font-size: var(--t-micro); color: var(--texto-suave); margin-top: 4px; }
+.loja-horario { font-size: var(--t-micro); color: var(--texto-fraco); margin-top: 2px; }
+.loja-viagem {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: var(--t-micro); color: var(--texto); margin-top: var(--e2);
+}
+.loja-viagem.aqui { color: var(--ok); }
+
+/* ---------- Modo de altura reduzida ----------
+   Para quem está sentado, o topo de um ecrã de 55" em retrato fica fora
+   de alcance. O cabeçalho encolhe e os controlos de navegação descem. */
+body.altura-reduzida .cabecalho { padding: var(--e2) var(--e5); }
+body.altura-reduzida .relogio-data { display: none; }
+body.altura-reduzida .marca-logo { font-size: var(--t-peq); }
+
+/* O «Voltar» passa do topo para o fim da coluna, ao alcance da mão. */
+body.altura-reduzida .voltar {
+  order: 90;
+  margin: 0 var(--e5) var(--e3);
+}
+body.altura-reduzida .navegacao   { order: 91; }
+body.altura-reduzida .barra-acess { order: 92; }
+body.altura-reduzida .corpo,
+body.altura-reduzida .conteudo    { order: 10; }
 
 /* ---------- Painel «como chegar» ---------- */
 .mapa-caixa { position: relative; }
@@ -725,6 +995,159 @@ const HORARIOS = {
   "88": ["06:10","07:00","07:50","08:40","09:30","10:20","11:10","12:00"]
 };
 
+
+/* ------------------------------------------------------------------
+   LINHAS — percursos e horários
+   Os horários são gerados a partir de uma frequência, para manter os
+   dados legíveis. Na versão real vêm do GTFS estático (stop_times.txt),
+   que dá as passagens efetivas em vez de um intervalo constante.
+   ------------------------------------------------------------------ */
+
+/* Expande um intervalo regular numa tabela { hora: [minutos] }. */
+function gerarHorario(hIni, mIni, hFim, mFim, intervalo) {
+  const tabela = {};
+  let t = hIni * 60 + mIni;
+  const fim = hFim * 60 + mFim;
+  while (t <= fim) {
+    const h = String(Math.floor(t / 60)).padStart(2, "0");
+    (tabela[h] ||= []).push(String(t % 60).padStart(2, "0"));
+    t += intervalo;
+  }
+  return tabela;
+}
+
+const LINHAS = {
+  "2": {
+    cor: "#378ADD",
+    servehospital: true,
+    terminais: ["Hospital de Braga", "Universidade do Minho"],
+    paragens: ["Hospital de Braga", "Sequeira", "Ferreiros", "S\u00e3o V\u00edtor",
+               "Avenida Central", "Pra\u00e7a da Rep\u00fablica", "S\u00e9",
+               "Largo do Pa\u00e7o", "Gualtar", "Universidade do Minho"],
+    horarios: {
+      uteis:   gerarHorario(6, 20, 23, 0, 20),
+      sabado:  gerarHorario(7,  0, 22, 0, 30),
+      domingo: gerarHorario(8,  0, 21, 0, 60)
+    }
+  },
+  "7": {
+    cor: "#8B5CF6",
+    servehospital: true,
+    terminais: ["Hospital de Braga", "Nogueira"],
+    paragens: ["Hospital de Braga", "Real", "Dume", "Palmeira",
+               "Sequeira", "Nogueira"],
+    horarios: {
+      uteis:   gerarHorario(6, 40, 21, 40, 40),
+      sabado:  gerarHorario(8,  0, 20, 0, 60),
+      domingo: gerarHorario(9,  0, 19, 0, 120)
+    }
+  },
+  "42": {
+    cor: "#D85A30",
+    servehospital: true,
+    terminais: ["Hospital de Braga", "Esta\u00e7\u00e3o CP"],
+    paragens: ["Hospital de Braga", "Pra\u00e7a do Mercado", "Avenida da Liberdade",
+               "Theatro Circo", "Pra\u00e7a da Rep\u00fablica", "Esta\u00e7\u00e3o CP"],
+    horarios: {
+      uteis:   gerarHorario(6, 35, 22, 35, 30),
+      sabado:  gerarHorario(7, 30, 21, 30, 45),
+      domingo: gerarHorario(9,  0, 20, 0, 90)
+    }
+  },
+  "87": {
+    cor: "#0EA5A0",
+    servehospital: true,
+    terminais: ["Hospital de Braga", "Lomar"],
+    paragens: ["Hospital de Braga", "Maximinos", "S\u00e3o Jer\u00f3nimo",
+               "Escola Secund\u00e1ria", "Lomar Centro", "Lomar"],
+    horarios: {
+      uteis:   gerarHorario(7,  0, 20, 0, 60),
+      sabado:  gerarHorario(9,  0, 19, 0, 120),
+      domingo: {}
+    }
+  },
+  "88": {
+    cor: "#1D9E75",
+    servehospital: true,
+    terminais: ["Hospital de Braga", "Gualtar"],
+    paragens: ["Hospital de Braga", "Sequeira", "Escola Secund\u00e1ria",
+               "S\u00e3o V\u00edtor", "Nogueir\u00f3", "Gualtar"],
+    horarios: {
+      uteis:   gerarHorario(6, 10, 22, 10, 50),
+      sabado:  gerarHorario(8,  0, 21, 0, 60),
+      domingo: gerarHorario(9, 30, 19, 30, 120)
+    }
+  },
+  "31": {
+    cor: "#E11D48",
+    terminais: ["Rotunda Estação II", "S\u00e3o V\u00edtor"],
+    paragens: ["Rotunda Esta\u00e7\u00e3o II", "Carlos Amarante", "Avenida Central",
+               "Pra\u00e7a da Rep\u00fablica", "S\u00e3o V\u00edtor"],
+    servehospital: false,
+    horarios: {
+      uteis:   gerarHorario(6, 45, 21, 45, 30),
+      sabado:  gerarHorario(8,  0, 20, 0, 60),
+      domingo: gerarHorario(9,  0, 19, 0, 120)
+    }
+  },
+  "66": {
+    cor: "#F59E0B",
+    terminais: ["Nogueir\u00f3", "Lomar"],
+    paragens: ["Nogueir\u00f3", "Dume", "Real", "Maximinos", "Lomar"],
+    servehospital: false,
+    horarios: {
+      uteis:   gerarHorario(7, 10, 20, 10, 45),
+      sabado:  gerarHorario(9,  0, 19, 0, 90),
+      domingo: {}
+    }
+  },
+  "74": {
+    cor: "#6366F1",
+    terminais: ["Esta\u00e7\u00e3o CP", "Palmeira"],
+    paragens: ["Esta\u00e7\u00e3o CP", "Theatro Circo", "S\u00e9", "Dume", "Palmeira"],
+    servehospital: false,
+    horarios: {
+      uteis:   gerarHorario(6, 55, 21, 25, 45),
+      sabado:  gerarHorario(8, 30, 19, 30, 90),
+      domingo: gerarHorario(10, 0, 18, 0, 120)
+    }
+  }
+};
+
+/* Lojas e pontos de venda. A primeira morada e o telefone são os que
+   constam da informação pública dos TUB; as restantes são plausíveis mas
+   por confirmar. 'viagem' segue o mesmo formato dos pontos de interesse
+   do mapa, para o passageiro saber como lá chegar a partir daqui. */
+const LOJAS = [
+  {
+    nome: "Loja TUB \u00b7 Sede",
+    morada: "Rua Quinta de Sta. Maria, 4700-244 Braga",
+    horario: "Seg. a sex., 8h00\u201319h00",
+    telefone: "253 606 890",
+    viagem: { linha: "2", paragem: "Avenida Central", aPe: 220 }
+  },
+  {
+    nome: "Loja TUB \u00b7 Esta\u00e7\u00e3o",
+    morada: "Rotunda da Esta\u00e7\u00e3o, 4700-223 Braga",
+    horario: "Seg. a sex., 7h30\u201319h30 \u00b7 S\u00e1b., 9h00\u201313h00",
+    telefone: null,
+    viagem: { linha: "42", paragem: "Esta\u00e7\u00e3o CP", aPe: 90 }
+  },
+  {
+    nome: "Posto de venda \u00b7 Hospital",
+    morada: "\u00c1trio principal do Hospital de Braga",
+    horario: "Seg. a sex., 9h00\u201317h00",
+    telefone: null,
+    viagem: null                     // é aqui mesmo
+  }
+];
+
+const TIPOS_DIA = [
+  { id: "uteis",   pt: "Dias \u00fateis",       en: "Weekdays" },
+  { id: "sabado",  pt: "S\u00e1bados",          en: "Saturdays" },
+  { id: "domingo", pt: "Dom. e feriados",  en: "Sun. and holidays" }
+];
+
 /* ------------------------------------------------------------------
    MAPA
    Cartografia esquemática, desenhada à mão em coordenadas próprias
@@ -762,26 +1185,32 @@ const MAPA = {
 
   // Traçado das ruas, apenas contexto visual
   ruas: [
-    "M 0 300 H 1000",
-    "M 0 620 H 1000",
-    "M 300 0 V 880",
-    "M 720 0 V 880",
-    "M 300 460 H 720"
+    "M 0 300 H 1000", "M 0 620 H 1000",
+    "M 300 0 V 880",  "M 720 0 V 880",
+    "M 300 460 H 720", "M 0 140 H 1000", "M 120 0 V 880"
   ],
 
-  // Percursos das linhas. O id é usado para posicionar os veículos.
-  rotas: [
-    { linha: "2",  cor: "#378ADD", d: "M 60 300 H 300 V 460 H 720 V 300 H 960" },
-    { linha: "88", cor: "#1D9E75", d: "M 300 40 V 620 H 960" },
-    { linha: "42", cor: "#D85A30", d: "M 60 620 H 720 V 40" }
-  ],
+  /* Traçado de cada carreira, indexado pelo número da linha.
+     'serveParagem' distingue as que passam nesta paragem das restantes:
+     é o que permite manter a vista local limpa e, ao mesmo tempo, dar
+     acesso à rede inteira. */
+  rotas: {
+    "2":  { serveParagem: true,  d: "M 60 300 H 300 V 460 H 720 V 300 H 960" },
+    "42": { serveParagem: true,  d: "M 60 620 H 720 V 40" },
+    "88": { serveParagem: true,  d: "M 300 40 V 620 H 960" },
+    "7":  { serveParagem: true,  d: "M 500 460 V 300 H 120 V 140 H 40" },
+    "87": { serveParagem: true,  d: "M 500 460 V 620 H 300 V 840" },
+    "31": { serveParagem: false, d: "M 40 140 H 720 V 300 H 960" },
+    "66": { serveParagem: false, d: "M 120 40 V 840 H 620" },
+    "74": { serveParagem: false, d: "M 960 100 H 720 V 620 H 120 V 780" }
+  },
 
   paragens: [
-    { nome: "Hospital de Braga", x: 500, y: 460, atual: true,  linhas: "2 · 13 · 42 · 88" },
+    { nome: "Hospital de Braga", x: 500, y: 460, atual: true,  linhas: "2 · 7 · 42 · 87 · 88" },
     { nome: "Sequeira",          x: 300, y: 300, atual: false, linhas: "2 · 88" },
     { nome: "Escola Secundária", x: 720, y: 620, atual: false, linhas: "42 · 88" },
-    { nome: "Praça do Mercado",  x: 300, y: 620, atual: false, linhas: "42" },
-    { nome: "Av. Central",       x: 720, y: 300, atual: false, linhas: "2 · 13" }
+    { nome: "Praça do Mercado",  x: 300, y: 620, atual: false, linhas: "42 · 87" },
+    { nome: "Av. Central",       x: 720, y: 300, atual: false, linhas: "2 · 31" }
   ],
 
   // Pontos de interesse, filtráveis. Curados à mão de propósito: importar
@@ -791,7 +1220,7 @@ const MAPA = {
   pontos: [
     { tipo: "farmacia",   nome: "Farmácia do Hospital", x: 415, y: 375 },
     { tipo: "farmacia",   nome: "Farmácia Sequeira",    x: 205, y: 545 },
-    { tipo: "farmacia",   nome: "Farmácia Central",     x: 880, y: 150,
+    { tipo: "farmacia",   nome: "Farmácia Central",     x: 880, y: 200,
       viagem: { linha: "2", paragem: "Av. Central", aPe: 180 } },
     { tipo: "multibanco", nome: "Multibanco · átrio",   x: 585, y: 375 },
     { tipo: "multibanco", nome: "Multibanco · Central", x: 860, y: 720,
@@ -801,19 +1230,26 @@ const MAPA = {
 };
 
 const TIPOS_PONTO = {
-  farmacia:   { rotulo: "Farmácias",  rotuloEN: "Pharmacies", cor: "#34D399" },
+  farmacia:   { rotulo: "Farmácias",  rotuloEN: "Pharmacies",  cor: "#34D399" },
   multibanco: { rotulo: "Multibanco", rotuloEN: "Cash points", cor: "#FBBF24" },
   taxi:       { rotulo: "Táxis",      rotuloEN: "Taxis",       cor: "#C4B5FD" }
 };
 
-/* Veículos em circulação. Na versão real vêm das VehiclePositions do
-   GTFS-RT; aqui o progresso ao longo do percurso avança sozinho.
+/* Veículos em circulação em toda a rede, não apenas nas linhas desta
+   paragem. Na versão real vêm das VehiclePositions do GTFS-RT; aqui o
+   progresso ao longo do traçado avança sozinho.
    progresso: 0 = início do traçado, 1 = fim. */
 let VEICULOS = [
-  { linha: "2",  rota: 0, progresso: 0.12, velocidade:  0.0016 },
-  { linha: "2",  rota: 0, progresso: 0.68, velocidade: -0.0013 },
-  { linha: "88", rota: 1, progresso: 0.40, velocidade:  0.0011 },
-  { linha: "42", rota: 2, progresso: 0.75, velocidade: -0.0018 }
+  { linha: "2",  progresso: 0.12, velocidade:  0.0016 },
+  { linha: "2",  progresso: 0.68, velocidade: -0.0013 },
+  { linha: "88", progresso: 0.40, velocidade:  0.0011 },
+  { linha: "42", progresso: 0.75, velocidade: -0.0018 },
+  { linha: "7",  progresso: 0.30, velocidade:  0.0014 },
+  { linha: "87", progresso: 0.55, velocidade: -0.0012 },
+  { linha: "31", progresso: 0.20, velocidade:  0.0015 },
+  { linha: "31", progresso: 0.80, velocidade: -0.0015 },
+  { linha: "66", progresso: 0.45, velocidade:  0.0010 },
+  { linha: "74", progresso: 0.62, velocidade: -0.0017 }
 ];
 
 /* Identificação técnica do equipamento. Serve o técnico em campo, não o
@@ -958,6 +1394,21 @@ const ICONES = {
       <path d="M38 38 52 8M82 38 68 8"/>
       <path d="M44 58v26M60 58v26M76 58v26"/></svg>`,
 
+  lupa: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>`,
+
+  inverter: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 4v16M7 4 3.5 7.5M7 4l3.5 3.5"/>
+      <path d="M17 20V4M17 20l3.5-3.5M17 20l-3.5-3.5"/></svg>`,
+
+  loja: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 9h16v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19V9z"/>
+      <path d="M3 9 4.8 4.2A1.5 1.5 0 0 1 6.2 3.2h11.6a1.5 1.5 0 0 1 1.4 1L21 9"/>
+      <path d="M9.5 13h5v7.5h-5z"/></svg>`,
+
   // Percurso a pé
   passos: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1017,6 +1468,14 @@ const app = {
   ultimaSinc: new Date(),
   filtros: { farmacia: true, multibanco: false, taxi: false },
   pontoAberto: null,
+  mapaModo: "paragem",     // paragem | rede
+  linhaMapa: null,         // carreira selecionada no modo rede
+  filtroLinha: "",         // dígitos escritos no teclado da rede
+  linhaDetalhe: null,      // null = lista de linhas; "42" = detalhe dessa linha
+  diaTipo: "uteis",
+  sentido: 0,
+  pesquisa: "",
+  teclado: false,
 
   /* O aviso em vigor vem do centro de controlo. Se já foi lido pelo
      passageiro que está aqui agora, isso lê-se no estado LEVANTADA —
@@ -1200,7 +1659,7 @@ function qrApp(destaque = false) {
 
 function navegacao() {
   const itens = [
-    { id: "horarios",  icone: ICONES.relogio, pt: "Horários",  en: "Timetables" },
+    { id: "horarios",  icone: ICONES.relogio, pt: "Horários e percursos", en: "Timetables and routes" },
     { id: "tarifario", icone: ICONES.bilhete, pt: "Tarifário", en: "Fares" },
     { id: "mapa",      icone: ICONES.mapa,    pt: "Mapa",      en: "Map" },
     { id: "info",      icone: ICONES.info,    pt: "Info",      en: "Info" }
@@ -1246,32 +1705,172 @@ function ecraInicio(teorico = false) {
 }
 
 /* --- Horários --- */
+/* --- Horários e percursos: seleção de linha --- */
 function ecraHorarios() {
-  const agora = new Date();
-  const horaAtual = agora.getHours() * 60 + agora.getMinutes();
-  const linhas = Object.keys(HORARIOS);
+  return app.linhaDetalhe ? detalheLinha() : listaLinhas();
+}
+
+/* Filtra por número de linha, terminal ou nome de paragem, e diz porquê. */
+function procurarLinhas(termo) {
+  const q = termo.trim().toLowerCase();
+  return Object.entries(LINHAS).map(([num, l]) => {
+    if (!q) return { num, l, motivo: null };
+    if (num.startsWith(q)) return { num, l, motivo: null };
+    const term = l.terminais.find(x => x.toLowerCase().includes(q));
+    if (term) return { num, l, motivo: term };
+    const par = l.paragens.find(x => x.toLowerCase().includes(q));
+    if (par) return { num, l, motivo: par };
+    return null;
+  }).filter(Boolean);
+}
+
+/* Disposição das letras. A evidência é contraditória: em estudos com
+   utilizadores sem experiência de teclado, a ordem alfabética ganha; com
+   qualquer exposição a telemóveis, ganha o QWERTY. Em 2026 a segunda
+   situação é a comum, mesmo entre público idoso, por isso é o predefinido.
+   Fica isolado numa constante para se poder testar no local com pessoas
+   reais — é o único modo de resolver a questão para esta paragem. */
+const LAYOUT_TECLADO = "qwerty";      // "qwerty" ou "alfabetico"
+
+/* Teclado do quiosque. Dígitos primeiro, porque a maioria das pesquisas é
+   pelo número da carreira; letras a seguir.
+
+   Cinco teclas por fila, e não dez: com dez, cada tecla ficaria com cerca
+   de 60 mm de largura no ecrã real, abaixo do mínimo definido para alvos
+   táteis. Duas filas custam uma linha e mantêm o alvo utilizável. */
+function teclado() {
+  const digitos = ["12345", "67890"];
+  const letras  = LAYOUT_TECLADO === "qwerty"
+    ? ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
+    : ["ABCDEFG", "HIJKLMN", "OPQRSTU", "VWXYZ"];
+  const fila = (chars, classe = "") => `<div class="teclado-fila">
+      ${[...chars].map(c => `<button class="tecla ${classe}" data-tecla="${c}">${c}</button>`).join("")}
+    </div>`;
+
   return `
-    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span> ${t("Voltar", "Back")}</button>
-    <div class="conteudo">
-      <div class="cartao">
-        <h3>${t("Escolha a linha", "Choose a route")}</h3>
-        <div style="display:flex; gap:var(--e2); margin-top:var(--e3)">
-          ${linhas.map(l => `
-            <button class="nav-botao ${app.linhaAberta === l ? "ativo" : ""}"
-                    style="min-height:120px; flex:1" data-linha="${l}">
-              <span class="nav-icone">${l}</span>
-            </button>`).join("")}
-        </div>
+    <div class="teclado">
+      ${digitos.map(f => fila(f, "digito")).join("")}
+      ${letras.map(f => fila(f)).join("")}
+      <div class="teclado-fila">
+        <button class="tecla larga" data-tecla=" ">${t("espaço", "space")}</button>
+        <button class="tecla larga" data-tecla="apagar">${t("apagar", "delete")}</button>
+        <button class="tecla larga" data-acao="fechar-teclado">${t("fechar", "close")}</button>
       </div>
-      <div class="cartao">
-        <h3>${t("Partidas de hoje", "Today's departures")} · ${t("linha","route")} ${app.linhaAberta}</h3>
-        <div class="horas" style="margin-top:var(--e3)">
-          ${HORARIOS[app.linhaAberta].map(h => {
-            const [hh, mm] = h.split(":").map(Number);
-            const passou = hh * 60 + mm < horaAtual;
-            return `<span class="${passou ? "passou" : ""}">${h}</span>`;
+    </div>`;
+}
+
+function listaLinhas() {
+  const resultados = procurarLinhas(app.pesquisa);
+
+  return `
+    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span>
+      ${t("Voltar", "Back")}</button>
+
+    <div class="conteudo">
+      <h2 class="titulo-ecra">${t("Horários e percursos", "Timetables and routes")}</h2>
+
+      <button class="pesquisa ${app.teclado ? "ativa" : ""}" data-acao="abrir-teclado">
+        <span class="pesquisa-icone">${ICONES.lupa}</span>
+        <span class="pesquisa-texto ${app.pesquisa ? "" : "vazio"}">
+          ${app.pesquisa || t("Procurar por linha, destino ou paragem",
+                              "Search by route, destination or stop")}
+        </span>
+        ${app.pesquisa ? `<span class="pesquisa-limpar" data-acao="limpar-pesquisa">×</span>` : ""}
+      </button>
+
+      ${app.teclado ? teclado() : ""}
+
+      ${resultados.length === 0
+        ? `<p class="sem-resultados">${t("Sem linhas para esta pesquisa.",
+                                         "No routes match this search.")}</p>`
+        : `<div class="grelha-linhas">
+            ${resultados.map(({ num, l, motivo }) => `
+              <button class="cartao-linha" data-detalhe="${num}">
+                <span class="cartao-linha-num" style="background:${l.cor}">${num}</span>
+                <span class="cartao-linha-txt">
+                  <span class="cartao-linha-destino">${l.terminais[1]}</span>
+                  ${motivo ? `<span class="cartao-linha-motivo">${t("passa em", "stops at")} ${motivo}</span>` : ""}
+                </span>
+              </button>`).join("")}
+          </div>`}
+    </div>`;
+}
+
+/* --- Detalhe: termómetro do percurso e tabelas de horários --- */
+function detalheLinha() {
+  const num = app.linhaDetalhe;
+  const l = LINHAS[num];
+  const paragens = app.sentido === 0 ? l.paragens : [...l.paragens].reverse();
+  const tabela = l.horarios[app.diaTipo] || {};
+  const horas = Object.keys(tabela).sort();
+
+  /* Destaque da hora corrente. Só faz sentido no quadro do dia de hoje:
+     olhar para sábado a meio de uma quarta-feira não tem "agora". */
+  const agora = new Date();
+  const hoje = app.diaTipo === tipoDiaHoje();
+  const horaAtual   = hoje ? agora.getHours()   : -1;
+  const minutoAtual = hoje ? agora.getMinutes() : -1;
+
+  return `
+    <button class="voltar" data-acao="voltar-lista">
+      <span class="voltar-icone">${ICONES.seta}</span> ${t("Todas as linhas", "All routes")}</button>
+
+    <div class="linha-cabecalho">
+      <span class="cartao-linha-num grande" style="background:${l.cor}">${num}</span>
+      <span class="linha-sentido">
+        <span class="linha-de">${paragens[0]}</span>
+        <span class="linha-para">${paragens[paragens.length - 1]}</span>
+      </span>
+      <button class="inverter" data-acao="inverter-sentido"
+              aria-label="${t("Inverter sentido", "Reverse direction")}">
+        ${ICONES.inverter}
+      </button>
+    </div>
+
+    <div class="abas">
+      ${TIPOS_DIA.map(d => `
+        <button class="aba ${app.diaTipo === d.id ? "ativa" : ""}" data-dia="${d.id}">
+          ${t(d.pt, d.en)}
+        </button>`).join("")}
+    </div>
+
+    <div class="duas-colunas">
+      <div class="coluna-percurso">
+        <h3 class="coluna-titulo">${t("Percurso", "Route")}</h3>
+        <ol class="termometro" style="--cor-linha:${l.cor}">
+          ${paragens.map((par, i) => {
+            const aqui = par === PARAGEM.nome;
+            const terminal = i === 0 || i === paragens.length - 1;
+            return `
+              <li class="parada ${aqui ? "aqui" : ""} ${terminal ? "terminal" : ""}">
+                <span class="parada-ponto"></span>
+                <span class="parada-nome">${par}</span>
+                ${aqui ? `<span class="parada-aqui">${t("está aqui", "you are here")}</span>` : ""}
+              </li>`;
           }).join("")}
-        </div>
+        </ol>
+      </div>
+
+      <div class="coluna-horario">
+        <h3 class="coluna-titulo">${t("Partidas", "Departures")}</h3>
+        ${horas.length === 0
+          ? `<p class="sem-servico">${t("Sem serviço neste dia.", "No service on this day.")}</p>`
+          : `<table class="quadro">
+              ${horas.map(h => {
+                const hora = Number(h);
+                const estado = hora < horaAtual ? "passada"
+                             : hora === horaAtual ? "agora" : "";
+                // Dentro da hora corrente, separa as partidas já perdidas
+                const minutos = tabela[h].map(m =>
+                  (hora < horaAtual || (hora === horaAtual && Number(m) < minutoAtual))
+                    ? `<span class="ido">${m}</span>` : `<span>${m}</span>`).join(" ");
+                return `
+                  <tr class="${estado}">
+                    <th>${h}</th>
+                    <td>${minutos}</td>
+                  </tr>`;
+              }).join("")}
+            </table>`}
       </div>
     </div>`;
 }
@@ -1279,7 +1878,8 @@ function ecraHorarios() {
 /* --- Tarifário --- */
 function ecraTarifario() {
   return `
-    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span> ${t("Voltar", "Back")}</button>
+    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span>
+      ${t("Voltar", "Back")}</button>
     <div class="conteudo">
       <div class="cartao">
         <h3>${t("Títulos de transporte", "Fares")}</h3>
@@ -1287,17 +1887,105 @@ function ecraTarifario() {
           ${TARIFARIO.map(x => `<tr><td>${x.titulo}</td><td>${x.preco}</td></tr>`).join("")}
         </table>
       </div>
+
       <div class="cartao">
-        <h3>${t("Onde comprar", "Where to buy")}</h3>
-        <p>${t(
-          "A bordo, nas lojas TUB, em agentes aderentes ou na aplicação móvel.",
-          "On board, at TUB stores, partner agents or the mobile app."
-        )}</p>
+        <h3>${t("Onde comprar e carregar", "Where to buy and top up")}</h3>
+        <div class="lojas">
+          ${LOJAS.map(loja => `
+            <div class="loja">
+              <span class="loja-icone">${ICONES.loja}</span>
+              <div class="loja-txt">
+                <div class="loja-nome">${loja.nome}</div>
+                <div class="loja-morada">${loja.morada}</div>
+                <div class="loja-horario">${loja.horario}${
+                  loja.telefone ? ` · ${loja.telefone}` : ""}</div>
+                ${loja.viagem ? `
+                  <div class="loja-viagem">
+                    ${t("Daqui", "From here")}:
+                    <span class="linha-chip pequeno"
+                          style="background:${LINHAS[loja.viagem.linha].cor}">${loja.viagem.linha}</span>
+                    ${t("até", "to")} ${loja.viagem.paragem},
+                    ${t("depois", "then")} ${Math.max(1, Math.round(loja.viagem.aPe / VELOCIDADE_PE / 60))} min ${t("a pé", "on foot")}
+                  </div>`
+                : `<div class="loja-viagem aqui">${t("Neste edifício", "In this building")}</div>`}
+              </div>
+            </div>`).join("")}
+        </div>
+        <p class="painel-nota">${t(
+          "Também pode carregar o seu passe em caixas multibanco e a bordo, com o cartão.",
+          "You can also top up at cash machines and on board, by card.")}</p>
       </div>
     </div>`;
 }
 
 /* --- Mapa --- */
+/* ------------------------------------------------------------------
+   QUALIDADE DOS DADOS
+   Degradado e offline não são ecrãs: são condições que atravessam todos
+   os ecrãs. Tudo o que depende de tempo real consulta esta função antes
+   de apresentar um número ao passageiro.
+   ------------------------------------------------------------------ */
+const temTempoReal = () =>
+  app.estado !== ESTADOS.DEGRADADO && app.estado !== ESTADOS.OFFLINE;
+
+/* Tipo de dia de hoje, para escolher o quadro horário certo. */
+function tipoDiaHoje() {
+  const d = new Date().getDay();          // 0 domingo … 6 sábado
+  return d === 0 ? "domingo" : d === 6 ? "sabado" : "uteis";
+}
+
+/* Próxima partida planeada de uma linha, quando não há tempo real.
+   Devolve "HH:MM" ou null se já não houver serviço hoje. */
+function proximaPartidaPlaneada(linha) {
+  const tabela = (LINHAS[linha] || {}).horarios;
+  if (!tabela) return null;
+  const hoje = tabela[tipoDiaHoje()] || {};
+  const agora = new Date();
+  const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
+  let melhor = null;
+  for (const [h, minutos] of Object.entries(hoje)) {
+    for (const m of minutos) {
+      const v = Number(h) * 60 + Number(m);
+      if (v >= minutosAgora && (melhor === null || v < melhor)) melhor = v;
+    }
+  }
+  if (melhor === null) return null;
+  return String(Math.floor(melhor / 60)).padStart(2, "0") + ":" +
+         String(melhor % 60).padStart(2, "0");
+}
+
+/* Faixa que explica o estado dos dados. Aparece em todos os ecrãs, não
+   só no inicial — quem entra no tarifário tem o mesmo direito a saber. */
+function avisoEstado() {
+  if (app.estado === ESTADOS.DEGRADADO) {
+    return `
+      <div class="aviso-estado">
+        <span class="aviso-estado-icone">${ICONES.antena}</span>
+        <div>
+          <h3>${t("Horários previstos", "Scheduled times")}</h3>
+          <p>${t(
+            "Sem ligação aos autocarros neste momento. Os tempos indicados são os planeados — o autocarro pode chegar antes ou depois.",
+            "No live connection to the vehicles. Times shown are scheduled and may vary.")}</p>
+        </div>
+      </div>`;
+  }
+  if (app.estado === ESTADOS.OFFLINE) {
+    const sinc = app.ultimaSinc.toLocaleTimeString("pt-PT",
+                   { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return `
+      <div class="aviso-estado">
+        <span class="aviso-estado-icone">${ICONES.antena}</span>
+        <div>
+          <h3>${t(`Última atualização foi às ${sinc}`, `Last updated at ${sinc}`)}</h3>
+          <p>${t(
+            "Este equipamento está sem ligação. Horários, tarifários e percursos continuam corretos; os tempos de espera não.",
+            "This unit is offline. Timetables, fares and routes remain correct; waiting times do not.")}</p>
+        </div>
+      </div>`;
+  }
+  return "";
+}
+
 /* --- Como chegar a um ponto de interesse ---
    Decide entre percurso a pé e viagem de autocarro em função da distância.
    Sugerir autocarro para 300 m é mau conselho; omiti-lo para 1 km também.
@@ -1314,9 +2002,13 @@ function comoChegar(p) {
     return { modo: "pe", metros, minutos };
   }
 
-  // Próxima passagem da linha indicada, a partir das chegadas em tempo real.
-  const proxima = CHEGADAS.find(c => c.linha === p.viagem.linha);
   const minutosFinais = Math.max(1, Math.round(p.viagem.aPe / VELOCIDADE_PE / 60));
+
+  // Com tempo real, diz-se dentro de quantos minutos parte. Sem ele, dá-se
+  // a hora planeada — nunca um número de minutos que não se pode garantir.
+  const proxima = temTempoReal()
+    ? CHEGADAS.find(c => c.linha === p.viagem.linha)
+    : null;
 
   return {
     modo: "autocarro",
@@ -1324,6 +2016,7 @@ function comoChegar(p) {
     linha: p.viagem.linha,
     paragemSaida: p.viagem.paragem,
     esperaMin: proxima ? proxima.eta : null,
+    horaPlaneada: temTempoReal() ? null : proximaPartidaPlaneada(p.viagem.linha),
     aPeFinalMin: minutosFinais,
     aPeFinalM: p.viagem.aPe
   };
@@ -1357,10 +2050,14 @@ function painelPonto() {
             ${t("Apanhe a linha", "Take route")}
             <span class="linha-chip pequeno">${r.linha}</span>
           </div>
-          <div class="passo-nota">${r.esperaMin !== null
-            ? t(`Parte desta paragem dentro de ${r.esperaMin} min`,
-                `Departs from this stop in ${r.esperaMin} min`)
-            : t("Consulte os horários", "Check the timetables")}</div>
+          <div class="passo-nota">${
+            r.esperaMin !== null
+              ? t(`Parte desta paragem dentro de ${r.esperaMin} min`,
+                  `Departs from this stop in ${r.esperaMin} min`)
+              : r.horaPlaneada
+                ? t(`Partida planeada às ${r.horaPlaneada}`,
+                    `Scheduled departure at ${r.horaPlaneada}`)
+                : t("Sem mais partidas hoje", "No more departures today")}</div>
         </div>
       </div>
       <div class="passo">
@@ -1394,66 +2091,180 @@ function painelPonto() {
 }
 
 function ecraMapa() {
+  return app.mapaModo === "rede" ? mapaRede() : mapaParagem();
+}
+
+/* --- Modo local: o que interessa a quem está nesta paragem --- */
+function mapaParagem() {
   const filtros = Object.entries(TIPOS_PONTO).map(([tipo, cfg]) => `
     <button class="filtro ${app.filtros[tipo] ? "ligado" : ""}" data-filtro="${tipo}">
       <span class="filtro-ponto" style="background:${cfg.cor}"></span>
       ${t(cfg.rotulo, cfg.rotuloEN)}
     </button>`).join("");
 
+  const rotas = Object.entries(MAPA.rotas).filter(([, r]) => r.serveParagem);
+  const veiculos = VEICULOS.filter(v => MAPA.rotas[v.linha].serveParagem);
+
   return `
-    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span>
-      ${t("Voltar", "Back")}</button>
-
+    ${cabecalhoMapa()}
     <div class="mapa-filtros">${filtros}</div>
-
     <div class="mapa-caixa">
       <svg id="mapa-svg" viewBox="0 0 1000 880" class="mapa-svg">
-
-        ${MAPA.ruas.map(d => `<path d="${d}" class="rua"/>`).join("")}
-
-        ${MAPA.rotas.map((r, i) =>
-          `<path id="rota-${i}" d="${r.d}" class="rota" stroke="${r.cor}"/>`).join("")}
-
-        ${MAPA.pontos.map((p, i) => !app.filtros[p.tipo] ? "" : `
-          <g class="ponto ${app.pontoAberto === i ? "aberto" : ""}" data-ponto="${i}">
-            <circle cx="${p.x}" cy="${p.y}" r="48" fill="transparent"/>
-            <circle cx="${p.x}" cy="${p.y}" r="${app.pontoAberto === i ? 24 : 17}"
-                    fill="${TIPOS_PONTO[p.tipo].cor}" stroke="#0E1621" stroke-width="4"/>
-            <text x="${p.x}" y="${p.y + 50}" class="ponto-nome">${p.nome}</text>
-          </g>`).join("")}
-
-        ${MAPA.paragens.map(p => `
-          <g class="paragem">
-            ${p.atual ? `<circle cx="${p.x}" cy="${p.y}" r="42" class="halo"/>` : ""}
-            <circle cx="${p.x}" cy="${p.y}" r="${p.atual ? 24 : 15}"
-                    fill="${p.atual ? "#E30613" : "#0E1621"}"
-                    stroke="#FFFFFF" stroke-width="5"/>
-            <text x="${p.x}" y="${p.y - (p.atual ? 60 : 34)}"
-                  class="paragem-nome ${p.atual ? "atual" : ""}">${p.nome}</text>
-            <text x="${p.x}" y="${p.y - (p.atual ? 26 : 34) + 34}"
-                  class="paragem-linhas">${p.atual ? "" : p.linhas}</text>
-          </g>`).join("")}
-
-        ${VEICULOS.map((v, i) => `
-          <g id="veiculo-${i}" class="veiculo">
-            <rect x="-38" y="-23" width="76" height="46" rx="10"
-                  fill="${MAPA.rotas[v.rota].cor}" stroke="#0E1621" stroke-width="4"/>
-            <text x="0" y="9" class="veiculo-linha">${v.linha}</text>
-          </g>`).join("")}
+        ${desenharRuas()}
+        ${rotas.map(([num, r]) =>
+          `<path id="rota-${num}" d="${r.d}" class="rota" stroke="${LINHAS[num].cor}"/>`).join("")}
+        ${desenharPontos()}
+        ${desenharParagens()}
+        ${desenharVeiculos(veiculos)}
       </svg>
       ${painelPonto()}
     </div>
+    ${legendaMapa()}`;
+}
 
+/* --- Modo rede: qualquer carreira, passe ou não por aqui --- */
+function mapaRede() {
+  const num = app.linhaMapa;
+  const l = num ? LINHAS[num] : null;
+  const veiculos = num ? VEICULOS.filter(v => v.linha === num) : [];
+
+  /* Com dezenas de carreiras, mostrar todas de uma vez deixa de funcionar.
+     O teclado numérico filtra à medida que se escreve: «8» reduz a lista
+     a 8, 87 e 88. Só dígitos — ninguém procura uma carreira por letras. */
+  const filtradas = Object.keys(LINHAS)
+    .filter(n => !app.filtroLinha || n.startsWith(app.filtroLinha))
+    .sort((a, b) => Number(a) - Number(b));
+
+  const numpad = `
+    <div class="numpad">
+      <div class="numpad-mostrador ${app.filtroLinha ? "" : "vazio"}">
+        ${app.filtroLinha || t("carreira", "route")}
+      </div>
+      ${["12345", "67890"].map(f => `<div class="numpad-fila">
+        ${[...f].map(d => `<button class="tecla-num" data-digito="${d}">${d}</button>`).join("")}
+      </div>`).join("")}
+      <div class="numpad-fila">
+        <button class="tecla-num acao" data-digito="apagar">${t("apagar", "delete")}</button>
+        <button class="tecla-num acao" data-digito="limpar">${t("ver todas", "show all")}</button>
+      </div>
+    </div>`;
+
+  const seletor = numpad + (filtradas.length === 0
+    ? `<p class="sem-resultados">${t("Nenhuma carreira com esse número.",
+                                     "No route with that number.")}</p>`
+    : `<div class="seletor-linhas">
+        ${filtradas.map(n => `
+          <button class="chip-linha ${app.linhaMapa === n ? "ativo" : ""}"
+                  style="${app.linhaMapa === n ? `background:${LINHAS[n].cor}; border-color:${LINHAS[n].cor}` : ""}"
+                  data-linha-mapa="${n}">${n}</button>`).join("")}
+      </div>`);
+
+  return `
+    ${cabecalhoMapa()}
+    ${seletor}
+
+    ${!l ? `
+      <div class="mapa-vazio">
+        <span class="mapa-vazio-icone">${ICONES.mapa}</span>
+        <p>${t("Escolha uma carreira para ver o percurso e os autocarros em circulação.",
+               "Choose a route to see its path and the buses currently running.")}</p>
+      </div>`
+    : `
+      <div class="linha-resumo" style="border-color:${l.cor}">
+        <span class="cartao-linha-num" style="background:${l.cor}">${num}</span>
+        <span class="linha-resumo-txt">
+          <span class="linha-resumo-terminais">${l.terminais[0]} — ${l.terminais[1]}</span>
+          <span class="linha-resumo-nota">
+            ${temTempoReal()
+              ? `${veiculos.length} ${t("em circulação", "in service")}`
+              : t("posições indisponíveis", "positions unavailable")} ·
+            ${l.servehospital
+              ? t("passa nesta paragem", "stops here")
+              : t("não passa nesta paragem", "does not stop here")}
+          </span>
+        </span>
+        <button class="ver-horario" data-ver-horario="${num}">${t("Horário", "Times")}</button>
+      </div>
+
+      <div class="mapa-caixa">
+        <svg id="mapa-svg" viewBox="0 0 1000 880" class="mapa-svg">
+          ${desenharRuas()}
+          ${Object.entries(MAPA.rotas).filter(([n]) => n !== num).map(([n, r]) =>
+            `<path d="${r.d}" class="rota apagada"/>`).join("")}
+          <path id="rota-${num}" d="${MAPA.rotas[num].d}" class="rota destaque"
+                stroke="${l.cor}"/>
+          ${l.paragens.map((_, i) =>
+            `<circle id="pl-${i}" class="paragem-linha" r="13" fill="#0E1621"
+                     stroke="${l.cor}" stroke-width="5"/>`).join("")}
+          ${desenharParagens(true)}
+          ${desenharVeiculos(veiculos)}
+        </svg>
+      </div>
+      ${legendaMapa(true)}`}`;
+}
+
+/* Peças partilhadas pelos dois modos */
+function cabecalhoMapa() {
+  return `
+    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span>
+      ${t("Voltar", "Back")}</button>
+    <div class="modos-mapa">
+      <button class="modo ${app.mapaModo !== "rede" ? "ativo" : ""}" data-modo="paragem">
+        ${t("Nesta paragem", "This stop")}
+      </button>
+      <button class="modo ${app.mapaModo === "rede" ? "ativo" : ""}" data-modo="rede">
+        ${t("Toda a rede", "Whole network")}
+      </button>
+    </div>`;
+}
+
+const desenharRuas = () => MAPA.ruas.map(d => `<path d="${d}" class="rua"/>`).join("");
+
+const desenharPontos = () => MAPA.pontos.map((p, i) => !app.filtros[p.tipo] ? "" : `
+  <g class="ponto ${app.pontoAberto === i ? "aberto" : ""}" data-ponto="${i}">
+    <circle cx="${p.x}" cy="${p.y}" r="48" fill="transparent"/>
+    <circle cx="${p.x}" cy="${p.y}" r="${app.pontoAberto === i ? 24 : 17}"
+            fill="${TIPOS_PONTO[p.tipo].cor}" stroke="#0E1621" stroke-width="4"/>
+    <text x="${p.x}" y="${p.y + 50}" class="ponto-nome">${p.nome}</text>
+  </g>`).join("");
+
+const desenharParagens = (soAtual = false) =>
+  MAPA.paragens.filter(p => !soAtual || p.atual).map(p => `
+    <g class="paragem">
+      ${p.atual ? `<circle cx="${p.x}" cy="${p.y}" r="42" class="halo"/>` : ""}
+      <circle cx="${p.x}" cy="${p.y}" r="${p.atual ? 24 : 15}"
+              fill="${p.atual ? "#E30613" : "#0E1621"}"
+              stroke="#FFFFFF" stroke-width="5"/>
+      <text x="${p.x}" y="${p.y - (p.atual ? 60 : 34)}"
+            class="paragem-nome ${p.atual ? "atual" : ""}">${p.nome}</text>
+      <text x="${p.x}" y="${p.y - (p.atual ? 26 : 34) + 34}"
+            class="paragem-linhas">${p.atual ? "" : p.linhas}</text>
+    </g>`).join("");
+
+/* Sem tempo real não se desenham autocarros. Mostrar a última posição
+   conhecida seria pior do que não mostrar nada: o passageiro compara com
+   o que vê na rua e deixa de confiar em todo o resto do equipamento. */
+const desenharVeiculos = lista => !temTempoReal() ? "" : lista.map((v, i) => `
+  <g id="veiculo-${i}" class="veiculo">
+    <rect x="-38" y="-23" width="76" height="46" rx="10"
+          fill="${LINHAS[v.linha].cor}" stroke="#0E1621" stroke-width="4"/>
+    <text x="0" y="9" class="veiculo-linha">${v.linha}</text>
+  </g>`).join("");
+
+function legendaMapa(rede = false) {
+  return `
     <div class="mapa-legenda">
-      <span class="legenda-item">
-        <span class="legenda-marca aqui"></span>${t("Está aqui", "You are here")}
-      </span>
-      <span class="legenda-item">
-        <span class="legenda-marca bus"></span>${t("Autocarro em circulação", "Bus in service")}
-      </span>
-      <span class="legenda-item">
-        <span class="legenda-marca paragem"></span>${t("Outras paragens", "Other stops")}
-      </span>
+      <span class="legenda-item"><span class="legenda-marca aqui"></span>
+        ${t("Está aqui", "You are here")}</span>
+      ${temTempoReal()
+        ? `<span class="legenda-item"><span class="legenda-marca bus"></span>
+             ${t("Autocarro em circulação", "Bus in service")}</span>`
+        : `<span class="legenda-item sem-dados">
+             <span class="legenda-marca vazia"></span>
+             ${t("Posição dos autocarros indisponível",
+                 "Bus positions unavailable")}</span>`}
+      ${rede ? "" : `<span class="legenda-item"><span class="legenda-marca paragem"></span>
+        ${t("Outras paragens", "Other stops")}</span>`}
     </div>`;
 }
 
@@ -1538,15 +2349,6 @@ function ecraPublicidade() {
 function ecraDegradado() {
   return `
     <div class="corpo">
-      <div class="aviso-estado">
-        <span class="aviso-estado-icone">${ICONES.antena}</span>
-        <div>
-          <h3>${t("Horários previstos", "Scheduled times")}</h3>
-          <p>${t(
-            "Sem ligação aos autocarros neste momento. As horas abaixo são as planeadas — o autocarro pode chegar antes ou depois.",
-            "No live connection to the vehicles. The times below are scheduled and may vary.")}</p>
-        </div>
-      </div>
       <div class="seccao-titulo">
         <h2>${t("Próximas partidas", "Next departures")}</h2>
       </div>
@@ -1566,16 +2368,6 @@ function ecraOffline() {
                  { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return `
     <div class="corpo">
-      <div class="aviso-estado">
-        <span class="aviso-estado-icone">${ICONES.antena}</span>
-        <div>
-          <h3>${t(`Última atualização foi às ${sinc}`,
-                  `Last updated at ${sinc}`)}</h3>
-          <p>${t(
-            "Este equipamento está sem ligação. Para horários atualizados, use a aplicação no seu telemóvel.",
-            "This unit is offline. For up-to-date times, please use the app on your phone.")}</p>
-        </div>
-      </div>
       <div class="seccao-titulo">
         <h2>${t("Última informação recebida", "Last information received")}</h2>
       </div>
@@ -1675,12 +2467,38 @@ function sobreposicaoAviso() {
 function posicionarVeiculos() {
   const svg = document.getElementById("mapa-svg");
   if (!svg) return;
-  VEICULOS.forEach((v, i) => {
-    const caminho = svg.querySelector(`#rota-${v.rota}`);
+
+  // Só os veículos visíveis no modo atual, pela mesma ordem da renderização
+  const visiveis = app.mapaModo === "rede"
+    ? (app.linhaMapa ? VEICULOS.filter(v => v.linha === app.linhaMapa) : [])
+    : VEICULOS.filter(v => MAPA.rotas[v.linha].serveParagem);
+
+  visiveis.forEach((v, i) => {
+    const caminho = svg.querySelector(`#rota-${v.linha}`);
     const marca   = svg.querySelector(`#veiculo-${i}`);
     if (!caminho || !marca || !caminho.getTotalLength) return;
     const ponto = caminho.getPointAtLength(v.progresso * caminho.getTotalLength());
     marca.setAttribute("transform", `translate(${ponto.x}, ${ponto.y})`);
+  });
+
+  posicionarParagensLinha(svg);
+}
+
+/* No modo rede, distribui as paragens da carreira ao longo do traçado.
+   A distribuição é uniforme porque o mapa é esquemático — com cartografia
+   real, cada paragem tem coordenadas próprias e isto desaparece. */
+function posicionarParagensLinha(svg) {
+  if (app.mapaModo !== "rede" || !app.linhaMapa) return;
+  const caminho = svg.querySelector(`#rota-${app.linhaMapa}`);
+  if (!caminho || !caminho.getTotalLength) return;
+  const total = caminho.getTotalLength();
+  const paragens = LINHAS[app.linhaMapa].paragens;
+  paragens.forEach((_, i) => {
+    const marca = svg.querySelector(`#pl-${i}`);
+    if (!marca) return;
+    const ponto = caminho.getPointAtLength((i / (paragens.length - 1)) * total);
+    marca.setAttribute("cx", ponto.x);
+    marca.setAttribute("cy", ponto.y);
   });
 }
 
@@ -1698,13 +2516,20 @@ function desenhar() {
       html = cabecalho() + ecraManutencao();
       break;
 
-    case ESTADOS.OFFLINE:
-      html = cabecalho() + ecraOffline() + navegacao();
-      break;
-
+    /* Degradado e offline não substituem a interface: qualificam-na. A
+       navegação mantém-se, porque horários, tarifários, lojas, percursos
+       e mapa continuam válidos — só os tempos de espera é que não. */
     case ESTADOS.DEGRADADO:
-      html = cabecalho() + ecraDegradado() + navegacao();
+    case ESTADOS.OFFLINE: {
+      const inicio = app.estado === ESTADOS.DEGRADADO ? ecraDegradado : ecraOffline;
+      const ecras = {
+        inicio, horarios: ecraHorarios, tarifario: ecraTarifario,
+        mapa: ecraMapa, info: ecraInfo
+      };
+      html = cabecalho() + avisoEstado() + (ecras[app.ecra] || inicio)();
+      if (app.ecra === "inicio") html += navegacao();
       break;
+    }
 
     case ESTADOS.PRIORIDADE:
       html = cabecalho() + ecraInicio() + navegacao() + sobreposicaoAviso();
@@ -1728,6 +2553,7 @@ function desenhar() {
 
   palco.innerHTML = html;
   document.body.classList.toggle("contraste", app.contraste);
+  document.body.classList.toggle("altura-reduzida", app.alturaReduzida);
   posicionarVeiculos();
   ajustarEscala();
   atualizarDev();
@@ -1739,29 +2565,70 @@ function desenhar() {
    ============================================================ */
 
 /* Escala o palco de 1080×1920 para caber na janela.
-   O modo de altura reduzida desloca o conteúdo para baixo,
-   simulando o uso por quem está sentado. */
+
+   O modo de altura reduzida NÃO desloca o palco: fazê-lo empurrava a barra
+   de acessibilidade para fora do ecrã, cortando precisamente o botão que
+   permite desligar o modo. Em vez disso, compacta o cabeçalho e manda os
+   controlos para baixo por CSS, o que traz o conteúdo acionável para a
+   zona alcançável por quem está sentado sem perder nada de vista. */
 function ajustarEscala() {
   const palco = document.getElementById("palco");
   const escala = Math.min(window.innerWidth / 1080, window.innerHeight / 1920) * 0.97;
-  const desvio = app.alturaReduzida ? 140 : 0;
-  palco.style.transform =
-    `translate(-50%, -50%) scale(${escala}) translateY(${desvio}px)`;
+  palco.style.transform = `translate(-50%, -50%) scale(${escala})`;
 }
 
 /* Delegação de eventos: um único listener trata todos os toques */
 document.addEventListener("click", e => {
   aoTocar();
 
-  const alvo = e.target.closest("[data-ecra], [data-linha], [data-acao], [data-filtro], [data-ponto]");
+  const alvo = e.target.closest("[data-ecra], [data-linha], [data-acao], [data-filtro], [data-ponto], [data-detalhe], [data-dia], [data-tecla], [data-modo], [data-linha-mapa], [data-ver-horario], [data-digito]");
   if (!alvo) return;
 
-  if (alvo.dataset.ecra)  { app.ecra = alvo.dataset.ecra; app.pontoAberto = null; }
+  if (alvo.dataset.ecra) {
+    app.ecra = alvo.dataset.ecra;
+    app.pontoAberto = null;
+    app.linhaDetalhe = null;
+    app.pesquisa = "";
+    app.teclado = false;
+  }
   if (alvo.dataset.linha) { app.linhaAberta = alvo.dataset.linha; }
   if (alvo.dataset.filtro) {
     const f = alvo.dataset.filtro;
     app.filtros[f] = !app.filtros[f];
     app.pontoAberto = null;          // o ponto aberto pode deixar de existir
+  }
+  if (alvo.dataset.detalhe) {
+    app.linhaDetalhe = alvo.dataset.detalhe;
+    app.sentido = 0;
+    app.teclado = false;
+  }
+  if (alvo.dataset.dia) { app.diaTipo = alvo.dataset.dia; }
+  if (alvo.dataset.modo) {
+    app.mapaModo = alvo.dataset.modo;
+    app.pontoAberto = null;
+    app.filtroLinha = "";
+  }
+  if (alvo.dataset.digito) {
+    const d = alvo.dataset.digito;
+    if (d === "apagar")      app.filtroLinha = app.filtroLinha.slice(0, -1);
+    else if (d === "limpar") app.filtroLinha = "";
+    else if (app.filtroLinha.length < 3) app.filtroLinha += d;
+    app.linhaMapa = null;
+  }
+  if (alvo.dataset.linhaMapa) {
+    const n = alvo.dataset.linhaMapa;
+    app.linhaMapa = app.linhaMapa === n ? null : n;   // segundo toque limpa
+  }
+  if (alvo.dataset.verHorario) {
+    app.ecra = "horarios";
+    app.linhaDetalhe = alvo.dataset.verHorario;
+    app.diaTipo = "uteis";
+    app.sentido = 0;
+  }
+  if (alvo.dataset.tecla) {
+    const k = alvo.dataset.tecla;
+    if (k === "apagar") app.pesquisa = app.pesquisa.slice(0, -1);
+    else if (app.pesquisa.length < 24) app.pesquisa += k;
   }
   if (alvo.dataset.ponto !== undefined) {
     const i = Number(alvo.dataset.ponto);
@@ -1782,6 +2649,11 @@ document.addEventListener("click", e => {
       if (app.estado === ESTADOS.PRIORIDADE ||
           app.estado === ESTADOS.LEVANTADA) irPara(ESTADOS.ATIVO);
       break;
+    case "abrir-teclado":    app.teclado = true; break;
+    case "fechar-teclado":   app.teclado = false; break;
+    case "limpar-pesquisa":  app.pesquisa = ""; break;
+    case "voltar-lista":     app.linhaDetalhe = null; break;
+    case "inverter-sentido": app.sentido = app.sentido === 0 ? 1 : 0; break;
     case "fechar-ponto":
       app.pontoAberto = null;
       break;
@@ -1850,6 +2722,7 @@ function atualizarDev() {
     b.onclick = ev => { ev.stopPropagation(); irPara(b.dataset.estado); });
 }
 
+app.diaTipo = tipoDiaHoje();
 desenhar();
 </script>
 </body>

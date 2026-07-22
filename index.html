@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUPI TUB — protótipo</title>
+
+<!--
+  ============================================================
+  PROTÓTIPO MUPI — Transportes Urbanos de Braga
+  ============================================================
+  Ficheiro único, sem build. Abre no browser e funciona.
+
+  Onde mexer:
+    [1] TOKENS      — cores, espaçamentos, tipografia
+    [2] DADOS       — paragem, linhas, chegadas, tarifário, campanhas
+    [3] ESTADO      — máquina de estados (6 estados do descritivo)
+    [4] ECRÃS       — cada função devolve o HTML de um ecrã
+    [5] ARRANQUE    — timers, eventos, painel de desenvolvimento
+
+  Modo kiosk (Windows):
+    chrome.exe --kiosk --app="file:///C:/.../index.html"
+
+  Painel de desenvolvimento: tecla D
+  ============================================================
+-->
+
+<style>
+/* ============================================================
+   [1] TOKENS
+   Toda a identidade visual vive aqui. Mudar uma variável muda
+   o protótipo inteiro. Confirmar cores com o manual de marca
+   dos TUB antes de fechar — estas são aproximações do logótipo.
+   ============================================================ */
+:root {
+  /* Marca */
+  --tub-azul:        #0072BC;
+  --tub-azul-escuro: #00548A;
+  --tub-vermelho:    #E30613;
+
+  /* Superfícies */
+  --fundo:      #0E1621;
+  --superficie: #16212F;
+  --elevado:    #1E2C3D;
+  --linha:      #2C3D52;
+
+  /* Texto */
+  --texto:        #FFFFFF;
+  --texto-suave:  #9FB2C7;
+  --texto-fraco:  #6B8099;
+
+  /* Semântica */
+  --ok:      #34D399;
+  --aviso:   #FBBF24;
+  --erro:    #F87171;
+  --ok-bg:     rgba(52,211,153,0.14);
+  --aviso-bg:  rgba(251,191,36,0.14);
+  --erro-bg:   rgba(248,113,113,0.16);
+
+  /* Tipografia — escala pensada para leitura a 1,5–2 m */
+  --fonte: system-ui, "Segoe UI", Roboto, sans-serif;
+  --t-nano:  20px;
+  --t-micro: 26px;
+  --t-peq:   32px;
+  --t-base:  38px;
+  --t-med:   48px;
+  --t-gr:    62px;
+  --t-xgr:   84px;
+
+  /* Espaçamento — grelha de 8 px */
+  --e1: 8px;  --e2: 16px; --e3: 24px;
+  --e4: 32px; --e5: 48px; --e6: 64px;
+
+  --raio: 16px;
+  --alvo: 160px;          /* altura mínima de alvo tátil */
+}
+
+/* Tema de alto contraste (acessibilidade) */
+body.contraste {
+  --fundo: #000000;
+  --superficie: #000000;
+  --elevado: #111111;
+  --linha: #FFFFFF;
+  --texto: #FFFFFF;
+  --texto-suave: #FFFFFF;
+  --texto-fraco: #DDDDDD;
+  --tub-azul: #4DA6FF;
+  --ok: #4ADE80;
+}
+
+/* ------------------------------------------------------------
+   Palco: o ecrã real é 2160×3840 (55" em retrato).
+   Desenhamos a 1080×1920 e escalamos — metade da resolução,
+   mesmas proporções. Em produção basta remover o transform.
+   ------------------------------------------------------------ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #000;
+  font-family: var(--fonte);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#palco {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 1080px; height: 1920px;
+  transform-origin: center center;
+  background: var(--fundo);
+  color: var(--texto);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Cabeçalho ---------- */
+.cabecalho {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--e4) var(--e5);
+  border-bottom: 2px solid var(--linha);
+  flex-shrink: 0;
+}
+.marca { display: flex; align-items: center; gap: var(--e3); }
+.marca-logo {
+  font-size: var(--t-med); font-weight: 800; letter-spacing: -2px;
+  color: var(--tub-azul);
+}
+.marca-logo span { color: var(--tub-vermelho); }
+.paragem { font-size: var(--t-peq); color: var(--texto-suave); }
+.relogio { text-align: right; }
+.relogio-hora { font-size: var(--t-med); font-weight: 600; font-variant-numeric: tabular-nums; }
+.relogio-data { font-size: var(--t-nano); color: var(--texto-fraco); }
+
+/* ---------- Corpo ---------- */
+.corpo { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+.seccao-titulo {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--e4) var(--e5) var(--e2);
+}
+.seccao-titulo h2 { font-size: var(--t-base); font-weight: 600; }
+.pulso {
+  display: flex; align-items: center; gap: var(--e1);
+  font-size: var(--t-micro); color: var(--ok);
+}
+.pulso::before {
+  content: ""; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--ok); animation: bater 2s infinite;
+}
+@keyframes bater { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+@media (prefers-reduced-motion: reduce) { .pulso::before { animation: none } }
+
+/* Dados envelhecidos: o ponto pára de pulsar e passa a âmbar. A ausência
+   de movimento é o sinal — nada está a chegar. */
+.pulso.velho { color: var(--aviso); }
+.pulso.velho::before { background: var(--aviso); animation: none; }
+
+/* ---------- Lista de chegadas ---------- */
+.chegadas { padding: 0 var(--e5); }
+.chegada {
+  display: flex; align-items: center; gap: var(--e4);
+  padding: var(--e4) 0;
+  border-bottom: 2px solid var(--linha);
+}
+.chegada:last-child { border-bottom: none; }
+.linha-chip {
+  min-width: 130px; text-align: center;
+  background: var(--tub-azul); color: #fff;
+  font-size: var(--t-med); font-weight: 700;
+  padding: var(--e2) var(--e3); border-radius: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.chegada-info { flex: 1; min-width: 0; }
+.chegada-destino {
+  font-size: var(--t-base); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chegada-nota {
+  display: flex; align-items: center; gap: var(--e1);
+  font-size: var(--t-micro); color: var(--texto-fraco); margin-top: 6px;
+}
+.chegada-nota.atraso { color: var(--aviso); }
+.chegada-eta {
+  font-size: var(--t-gr); font-weight: 700; text-align: right;
+  min-width: 240px; font-variant-numeric: tabular-nums;
+}
+.chegada-eta.perto { color: var(--ok); }
+.chegada-eta small { font-size: var(--t-peq); font-weight: 400; color: var(--texto-fraco); }
+.chegada-eta.teorico { color: var(--texto-suave); }
+
+/* ---------- Cartão do QR da app ---------- */
+.qr-cartao {
+  display: flex; align-items: center; gap: var(--e4);
+  margin: var(--e3) var(--e5);
+  padding: var(--e3) var(--e4);
+  background: var(--superficie);
+  border: 2px solid var(--linha);
+  border-radius: var(--raio);
+}
+.qr-moldura {
+  flex-shrink: 0;
+  width: 190px; height: 190px;
+  background: #FFFFFF;          /* fundo branco sempre: o QR tem de ler-se */
+  border-radius: 12px;
+  padding: 10px;
+}
+.qr-codigo { width: 100%; height: 100%; display: block; }
+.qr-texto { flex: 1; min-width: 0; }
+.qr-texto h3 {
+  font-size: var(--t-base); font-weight: 600; margin-bottom: var(--e1);
+}
+.qr-texto p {
+  font-size: var(--t-peq); color: var(--texto-suave); line-height: 1.4;
+}
+.qr-lojas {
+  display: flex; gap: var(--e3); margin-top: var(--e2);
+  font-size: var(--t-micro); color: var(--texto-fraco);
+}
+
+/* No ecrã institucional o cartão é maior e centrado */
+.qr-cartao.destaque { flex-direction: column; text-align: center; margin: 0; }
+.qr-cartao.destaque .qr-moldura { width: 380px; height: 380px; }
+
+/* ---------- Navegação ---------- */
+.navegacao {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e2);
+  padding: var(--e3) var(--e5);
+  border-top: 2px solid var(--linha);
+  flex-shrink: 0;
+}
+.nav-botao {
+  min-height: var(--alvo);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--e2);
+  background: var(--elevado); border: none; border-radius: var(--raio);
+  color: var(--texto); font-family: inherit; font-size: var(--t-peq);
+  cursor: pointer; transition: background .15s;
+}
+.nav-botao:active { background: var(--tub-azul); }
+.nav-botao:focus-visible { outline: 4px solid var(--tub-azul); outline-offset: 4px; }
+.nav-icone { font-size: 56px; line-height: 1; }
+.nav-icone svg { width: 56px; height: 56px; display: block; }
+.nav-botao.ativo { background: var(--tub-azul); }
+
+/* ---------- Barra de acessibilidade ---------- */
+.barra-acess {
+  display: flex; gap: var(--e2);
+  padding: 0 var(--e5) var(--e4);
+  flex-shrink: 0;
+}
+.acess-botao {
+  flex: 1; min-height: 96px;
+  display: flex; align-items: center; justify-content: center; gap: var(--e2);
+  background: transparent; border: 2px solid var(--linha); border-radius: var(--raio);
+  color: var(--texto-suave); font-family: inherit; font-size: var(--t-micro);
+  cursor: pointer;
+}
+.acess-botao[aria-pressed="true"] { border-color: var(--tub-azul); color: var(--texto); }
+
+/* ---------- Ecrãs secundários ---------- */
+.voltar {
+  display: flex; align-items: center; gap: var(--e2);
+  margin: var(--e3) var(--e5) 0;
+  min-height: 110px; padding: 0 var(--e4);
+  background: var(--elevado); border: none; border-radius: var(--raio);
+  color: var(--texto); font-family: inherit; font-size: var(--t-peq);
+  cursor: pointer;
+}
+.conteudo { padding: var(--e3) var(--e5); overflow: hidden; }
+.cartao {
+  background: var(--superficie); border-radius: var(--raio);
+  padding: var(--e4); margin-bottom: var(--e3);
+}
+.cartao h3 { font-size: var(--t-base); font-weight: 600; margin-bottom: var(--e2); }
+.cartao p  { font-size: var(--t-peq); color: var(--texto-suave); line-height: 1.5; }
+.tabela { width: 100%; border-collapse: collapse; font-size: var(--t-peq); }
+.tabela td { padding: var(--e3) 0; border-bottom: 2px solid var(--linha); }
+.tabela td:last-child { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tabela tr:last-child td { border-bottom: none; }
+.horas {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--e2);
+  font-size: var(--t-peq); font-variant-numeric: tabular-nums;
+}
+.horas span {
+  background: var(--elevado); border-radius: 10px;
+  padding: var(--e2) 0; text-align: center;
+}
+.horas span.passou { color: var(--texto-fraco); background: transparent; }
+
+/* ---------- Publicidade (estado inativo) ---------- */
+.publicidade { flex: 1; display: flex; flex-direction: column; }
+.criativo {
+  position: relative;
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--e3);
+  padding: var(--e5) var(--e5) 200px;   /* espaço reservado à pastilha de toque */
+  text-align: center;
+}
+/* Marcador de conteúdo comercial. Discreto, mas presente: distinguir
+   publicidade de informação institucional é boa prática e, em suporte
+   municipal, é matéria que costuma estar regulamentada. */
+.criativo-marcador {
+  position: absolute; top: var(--e4); right: var(--e4);
+  font-size: var(--t-nano); letter-spacing: 2px; text-transform: uppercase;
+  opacity: .6;
+}
+.criativo-icone {
+  height: 240px;
+  display: flex; align-items: center; justify-content: center;
+}
+.criativo-icone svg { height: 100%; width: auto; }
+.criativo-marca {
+  font-size: var(--t-med); font-weight: 400;
+  letter-spacing: 6px; text-transform: uppercase;
+  opacity: .85;
+}
+.criativo-titulo { font-size: var(--t-xgr); font-weight: 700; color: #fff; line-height: 1.1; }
+.criativo-legenda { font-size: var(--t-base); max-width: 800px; line-height: 1.35; }
+.faixa-persistente {
+  background: var(--superficie);
+  border-top: 4px solid var(--tub-azul);
+  padding: var(--e3) var(--e5);
+  flex-shrink: 0;
+}
+.faixa-linha {
+  display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e2) 0; font-size: var(--t-base);
+}
+.faixa-linha .linha-chip { min-width: 100px; font-size: var(--t-peq); padding: 8px var(--e2); }
+.faixa-linha .destino { flex: 1; }
+.faixa-linha .eta { font-weight: 700; font-variant-numeric: tabular-nums; }
+.toque {
+  position: absolute;
+  bottom: 60px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; justify-content: center; gap: var(--e3);
+  padding: var(--e3) var(--e4);
+  white-space: nowrap;
+  background: #FFFFFF;
+  color: var(--tub-azul);
+  border-radius: 999px;
+  font-size: var(--t-base); font-weight: 700;
+}
+.toque-dedo {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 68px; height: 68px;
+}
+.toque-dedo svg { width: 60px; height: 60px; }
+/* Ondas concêntricas a partir do dedo. Brancas, para se lerem sobre o
+   criativo seja qual for a sua cor. Substituem o brilho difuso: a
+   affordance vem do movimento e do contraste, não de efeitos. */
+.toque-onda {
+  position: absolute; inset: -8px;
+  border: 4px solid rgba(255,255,255,.9);
+  border-radius: 50%;
+  opacity: 0;
+  animation: ondular 2.6s ease-out infinite;
+}
+.toque-onda:nth-child(2) { animation-delay: .8s; }
+
+@keyframes ondular {
+  0%   { transform: scale(.5);  opacity: .95 }
+  55%  { transform: scale(2.8); opacity: 0 }
+  100% { transform: scale(2.8); opacity: 0 }
+}
+
+/* Sem movimento para quem o desativou no sistema. A pastilha branca
+   sozinha já se lê como alvo — perde-se o chamamento, não a mensagem. */
+@media (prefers-reduced-motion: reduce) {
+  .toque-onda { animation: none; opacity: .4; transform: scale(1.8) }
+}
+
+/* ---------- Ecrãs de sistema ---------- */
+.sistema {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--e3);
+  text-align: center; padding: var(--e6);
+}
+.sistema-icone { font-size: 180px; }
+.sistema h2 { font-size: var(--t-gr); font-weight: 700; }
+.sistema p { font-size: var(--t-base); color: var(--texto-suave); line-height: 1.5; }
+
+/* ---------- Faixa de aviso ---------- */
+.faixa-aviso {
+  display: flex; gap: var(--e3); align-items: center;
+  margin: var(--e3) var(--e5);
+  padding: var(--e3) var(--e4);
+  background: var(--aviso-bg);
+  border-left: 8px solid var(--aviso);
+  font-size: var(--t-peq); color: var(--aviso);
+}
+.faixa-aviso-texto { flex: 1; min-width: 0; line-height: 1.25; }
+
+/* Aviso prioritário já dispensado: mesma posição, vermelho e a negrito.
+   A cor distingue "há um desvio" de "a linha está suspensa". */
+.faixa-aviso.critico {
+  background: var(--erro-bg);
+  border-left-color: var(--erro);
+  color: var(--erro);
+}
+.faixa-aviso.critico strong { font-weight: 700; }
+.faixa-aviso.critico .faixa-aviso-texto { font-size: var(--t-peq); }
+
+/* ---------- Aviso prioritário (sobreposto) ----------
+   O escurecimento é parcial de propósito: deixa entrever a interface por
+   baixo, para se perceber que está lá e continua a funcionar. */
+.sobreposicao {
+  position: absolute; inset: 0; z-index: 50;
+  background: rgba(6,10,16,.74);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--e4);
+  padding: var(--e5);
+}
+.aviso-painel {
+  width: 100%;
+  background: var(--superficie);
+  border: 4px solid var(--aviso);
+  border-radius: var(--raio);
+  padding: var(--e6) var(--e5);
+  display: flex; flex-direction: column; align-items: center; gap: var(--e3);
+  text-align: center;
+}
+.aviso-painel .icone svg { width: 130px; height: 130px; color: var(--aviso); }
+.aviso-painel h2 { font-size: var(--t-gr); font-weight: 800; color: var(--aviso); }
+.aviso-painel p  { font-size: var(--t-med); line-height: 1.4; }
+
+/* Convite a dispensar o aviso. Repete a linguagem da pastilha do estado
+   inativo — branco sólido, ondas — para o gesto ser o mesmo em todo o lado. */
+.aviso-continuar {
+  position: relative;
+  display: flex; align-items: center; justify-content: center; gap: var(--e3);
+  padding: var(--e3) var(--e4);
+  background: #FFFFFF;
+  color: var(--tub-azul);
+  border-radius: 999px;
+  font-size: var(--t-base); font-weight: 700;
+  white-space: nowrap;
+}
+.aviso-continuar .toque-dedo { width: 60px; height: 60px; }
+.aviso-continuar .toque-dedo svg { width: 52px; height: 52px; }
+
+/* ---------- Aviso de estado (degradado / offline) ----------
+   Explica ao passageiro o que está diferente e o que pode fazer.
+   Fica no topo do corpo, antes da informação que qualifica. */
+.aviso-estado {
+  display: flex; gap: var(--e4); align-items: flex-start;
+  margin: var(--e3) var(--e5);
+  padding: var(--e4);
+  background: var(--aviso-bg);
+  border-left: 8px solid var(--aviso);
+}
+.aviso-estado-icone { flex-shrink: 0; }
+.aviso-estado-icone svg { width: 64px; height: 64px; color: var(--aviso); }
+.aviso-estado h3 {
+  font-size: var(--t-base); font-weight: 600; color: var(--aviso);
+  margin-bottom: 6px;
+}
+.aviso-estado p { font-size: var(--t-peq); color: var(--texto-suave); line-height: 1.4; }
+
+/* ---------- Alternativas (ecrã de manutenção) ----------
+   Um equipamento fora de serviço tem de dizer para onde ir a seguir.
+   Três caminhos, com o QR primeiro por ser o único acionável ali mesmo. */
+.alternativas {
+  display: flex; gap: var(--e3); align-items: stretch;
+  width: 100%; margin-top: var(--e5);
+}
+.alternativa {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--e2);
+  background: var(--superficie);
+  border-radius: var(--raio);
+  padding: var(--e4) var(--e3);
+}
+.alternativa .qr-moldura { width: 200px; height: 200px; }
+.alternativa strong { font-size: var(--t-med); font-weight: 700; }
+.alternativa span {
+  font-size: var(--t-micro); color: var(--texto-suave); text-align: center;
+}
+
+/* ---------- Mapa ---------- */
+.mapa-filtros {
+  display: flex; gap: var(--e2);
+  padding: var(--e3) var(--e5) 0;
+}
+.filtro {
+  flex: 1; min-height: 96px;
+  display: flex; align-items: center; justify-content: center; gap: var(--e2);
+  background: transparent; border: 2px solid var(--linha); border-radius: var(--raio);
+  color: var(--texto-fraco); font-family: inherit; font-size: var(--t-micro);
+  cursor: pointer;
+}
+.filtro.ligado { border-color: var(--tub-azul); color: var(--texto); background: var(--elevado); }
+.filtro-ponto { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+
+.mapa-caixa {
+  margin: var(--e3) var(--e5);
+  background: var(--superficie);
+  border-radius: var(--raio);
+  overflow: hidden;
+}
+.mapa-svg { width: 100%; height: auto; display: block; }
+
+.rua  { stroke: #24344A; stroke-width: 26; fill: none; stroke-linecap: round; }
+.rota { fill: none; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
+
+.halo {
+  fill: rgba(227,6,19,.22);
+  animation: pulsar 2.6s ease-out infinite;
+}
+@keyframes pulsar {
+  0%   { transform: scale(.7); opacity: .8 }
+  70%  { transform: scale(1.5); opacity: 0 }
+  100% { transform: scale(1.5); opacity: 0 }
+}
+.halo { transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .halo { animation: none; opacity: .5 } }
+
+.paragem-nome {
+  fill: #FFFFFF; font-size: 26px; font-weight: 600;
+  text-anchor: middle; font-family: var(--fonte);
+  paint-order: stroke; stroke: #16212F; stroke-width: 7px; stroke-linejoin: round;
+}
+.paragem-nome.atual { font-size: 34px; font-weight: 700; }
+.paragem-linhas {
+  fill: #9FB2C7; font-size: 21px; text-anchor: middle; font-family: var(--fonte);
+  paint-order: stroke; stroke: #16212F; stroke-width: 6px; stroke-linejoin: round;
+}
+.ponto-nome {
+  fill: #9FB2C7; font-size: 21px; text-anchor: middle; font-family: var(--fonte);
+  paint-order: stroke; stroke: #16212F; stroke-width: 6px; stroke-linejoin: round;
+}
+.veiculo-linha {
+  fill: #0E1621; font-size: 30px; font-weight: 700;
+  text-anchor: middle; font-family: var(--fonte);
+}
+/* A transição suaviza o salto entre atualizações de posição, tal como
+   aconteceria com dados reais a chegar de poucos em poucos segundos. */
+.veiculo { transition: transform .45s linear; }
+@media (prefers-reduced-motion: reduce) { .veiculo { transition: none } }
+
+.mapa-legenda {
+  display: flex; justify-content: center; gap: var(--e5);
+  padding: 0 var(--e5) var(--e3);
+}
+.legenda-item {
+  display: flex; align-items: center; gap: var(--e2);
+  font-size: var(--t-micro); color: var(--texto-suave);
+}
+.legenda-marca { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; }
+.legenda-marca.aqui    { background: var(--tub-vermelho); border: 3px solid #fff; }
+.legenda-marca.paragem { background: var(--fundo); border: 3px solid #fff; }
+.legenda-marca.bus     { background: var(--tub-azul); border-radius: 6px; width: 34px; height: 22px; }
+
+/* ---------- Painel «como chegar» ---------- */
+.mapa-caixa { position: relative; }
+.ponto-painel {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--elevado);
+  border-top: 4px solid var(--tub-azul);
+  padding: var(--e4) var(--e4) var(--e3);
+}
+.ponto-painel-topo {
+  display: flex; align-items: center; gap: var(--e3);
+  padding-bottom: var(--e3);
+  border-bottom: 2px solid var(--linha);
+}
+.ponto-painel-marca { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+.ponto-painel-nome { flex: 1; font-size: var(--t-base); font-weight: 600; }
+.ponto-fechar {
+  width: 84px; height: 84px; flex-shrink: 0;
+  background: var(--superficie); border: 2px solid var(--linha); border-radius: 50%;
+  color: var(--texto); font-family: inherit; font-size: 44px; line-height: 1;
+  cursor: pointer;
+}
+.ponto-painel-corpo { padding-top: var(--e3); }
+
+.passo {
+  display: flex; align-items: flex-start; gap: var(--e3);
+  padding: var(--e2) 0;
+}
+.passo-numero {
+  flex-shrink: 0;
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--tub-azul); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--t-peq); font-weight: 700;
+}
+.passo-icone { flex-shrink: 0; display: inline-flex; }
+.passo-icone svg { width: 54px; height: 54px; }
+.passo-titulo {
+  display: flex; align-items: center; gap: var(--e2);
+  font-size: var(--t-base); font-weight: 600;
+}
+.passo-nota { font-size: var(--t-micro); color: var(--texto-suave); margin-top: 4px; }
+.linha-chip.pequeno { min-width: 0; font-size: var(--t-peq); padding: 4px var(--e2); }
+.painel-nota {
+  font-size: var(--t-micro); color: var(--texto-fraco);
+  margin-top: var(--e2); padding-top: var(--e2);
+  border-top: 2px solid var(--linha);
+}
+
+.ponto.aberto .ponto-nome { fill: #FFFFFF; font-weight: 600; }
+
+/* Rodapé técnico: existe para quem faz manutenção no local ler sem abrir
+   nada. Deliberadamente pequeno — o passageiro não precisa de o notar. */
+.rodape-tecnico {
+  text-align: center;
+  padding: var(--e3) 0;
+  font-size: var(--t-nano);
+  color: var(--texto-fraco);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dimensionamento dos ícones vetoriais */
+.acess-icone svg   { width: 34px; height: 34px; display: block; }
+.acess-icone       { display: inline-flex; }
+.nota-icone svg    { width: 30px; height: 30px; display: block; }
+.nota-icone        { display: inline-flex; }
+.faixa-icone svg   { width: 40px; height: 40px; display: block; flex-shrink: 0; }
+.faixa-icone       { display: inline-flex; }
+.voltar-icone svg  { width: 42px; height: 42px; display: block; }
+.voltar-icone      { display: inline-flex; }
+.pino-icone svg    { width: 38px; height: 38px; display: block; }
+.pino-icone        { display: inline-flex; }
+.sobreposicao .icone svg { width: 180px; height: 180px; }
+.sistema-icone svg { width: 180px; height: 180px; }
+.mapa-marcador svg { width: 150px; height: 150px; color: var(--texto-fraco); }
+
+/* ---------- Painel de desenvolvimento (tecla D) ---------- */
+#dev {
+  position: fixed; top: 12px; right: 12px; z-index: 999;
+  background: #0B0B0B; border: 1px solid #333; border-radius: 10px;
+  padding: 12px; font: 13px/1.5 var(--fonte); color: #EEE;
+  display: none; max-width: 260px;
+}
+#dev.aberto { display: block; }
+#dev h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 8px; }
+#dev button {
+  display: block; width: 100%; text-align: left;
+  background: #1A1A1A; color: #EEE; border: 1px solid #333;
+  border-radius: 6px; padding: 7px 10px; margin-bottom: 5px;
+  font: inherit; cursor: pointer;
+}
+#dev button:hover { background: #262626; }
+#dev button.on { border-color: #4DA6FF; color: #4DA6FF; }
+#dev .nota { color: #777; font-size: 11px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div id="palco" role="application" aria-label="Ponto de informação TUB"></div>
+
+<div id="dev">
+  <h4>Estados</h4>
+  <div id="dev-estados"></div>
+  <h4 style="margin-top:12px">Ações</h4>
+  <button data-acao="aviso">Disparar aviso prioritário</button>
+  <button data-acao="limpar-aviso">Levantar aviso</button>
+  <button data-acao="contraste">Alternar alto contraste</button>
+  <button data-acao="idioma">Alternar PT / EN</button>
+  <p class="nota">D para fechar</p>
+</div>
+
+<script>
+/* ============================================================
+   [2] DADOS
+   Formato inspirado no GTFS / GTFS-Realtime para que a troca
+   pela API verdadeira seja apenas substituir estas funções.
+   ============================================================ */
+
+const PARAGEM = {
+  id: "TUB-1042",
+  nome: "Hospital de Braga",
+  nomeEN: "Braga Hospital"
+};
+
+// Equivalente a uma entidade TripUpdate do GTFS-RT
+let CHEGADAS = [
+  { linha: "2",  destino: "Universidade do Minho", destinoEN: "University of Minho",
+    eta: 3,  tempoReal: true,  acessivel: true,  atraso: 0 },
+  { linha: "42", destino: "Estação CP · Centro",   destinoEN: "CP Station · Downtown",
+    eta: 9,  tempoReal: true,  acessivel: false, atraso: 4 },
+  { linha: "88", destino: "Gualtar",               destinoEN: "Gualtar",
+    eta: 17, tempoReal: false, acessivel: true,  atraso: 0 },
+  { linha: "2",  destino: "Universidade do Minho", destinoEN: "University of Minho",
+    eta: 23, tempoReal: true,  acessivel: true,  atraso: 0 },
+  { linha: "13", destino: "São Vítor",             destinoEN: "São Vítor",
+    eta: 28, tempoReal: true,  acessivel: true,  atraso: 0 }
+];
+
+// Equivalente a ServiceAlerts
+const AVISOS = [
+  { texto: "Linha 42 com desvio na Av. da Liberdade até 25 jul",
+    textoEN: "Route 42 diverted on Av. da Liberdade until 25 Jul",
+    prioritario: false }
+];
+
+const AVISO_PRIORITARIO = {
+  titulo: "Serviço suspenso",
+  tituloEN: "Service suspended",
+  texto: "Linha 2 suspensa entre Hospital e Gualtar por acidente. Use a linha 88.",
+  textoEN: "Route 2 suspended between Hospital and Gualtar. Please use route 88."
+};
+
+const TARIFARIO = [
+  { titulo: "Bilhete a bordo",        preco: "2,00 €" },
+  { titulo: "Bilhete pré-comprado",   preco: "1,35 €" },
+  { titulo: "Passe mensal urbano",    preco: "30,00 €" },
+  { titulo: "Passe sub-23",           preco: "20,00 €" },
+  { titulo: "Passe +65",              preco: "20,00 €" },
+  { titulo: "Crianças até 4 anos",    preco: "grátis" }
+];
+
+const HORARIOS = {
+  "2":  ["06:20","06:50","07:20","07:35","07:50","08:05","08:20","08:35","08:50",
+         "09:10","09:40","10:10","10:40","11:10","11:40"],
+  "42": ["06:35","07:05","07:45","08:15","08:45","09:25","10:05","10:45",
+         "11:25","12:05"],
+  "88": ["06:10","07:00","07:50","08:40","09:30","10:20","11:10","12:00"]
+};
+
+/* ------------------------------------------------------------------
+   MAPA
+   Cartografia esquemática, desenhada à mão em coordenadas próprias
+   (1000×880). NÃO é geograficamente exata — serve para validar o desenho
+   e a interação. Na versão real substitui-se o fundo por tiles de mapa
+   pré-descarregados: como o equipamento nunca sai do sítio, basta guardar
+   os tiles de um raio de 1 km e o mapa funciona sem rede.
+
+   As coordenadas passariam então a latitude/longitude, convertidas para
+   pixels na projeção do mapa. Tudo o resto — paragens, veículos, pontos
+   de interesse — mantém a mesma estrutura.
+   ------------------------------------------------------------------ */
+/* Escala do mapa esquemático: metros por unidade do viewBox. Fixada de
+   modo a que a área representada corresponda a cerca de 1,2 km de lado.
+   Ao passar para cartografia real, isto deixa de ser necessário — as
+   distâncias calculam-se a partir das coordenadas geográficas. */
+const ESCALA_MAPA = 1.2;
+
+/* Fator de sinuosidade: a distância em linha reta subestima o percurso
+   a pé, que contorna edifícios e cruza passadeiras. 1,3 é o valor de
+   referência habitual em planeamento urbano. */
+const SINUOSIDADE = 1.3;
+
+/* Velocidade de marcha em metros por segundo. Deliberadamente baixa:
+   esta paragem serve um hospital, com forte presença de utentes idosos,
+   convalescentes e pessoas com mobilidade reduzida. O valor corrente de
+   1,4 m/s produziria estimativas otimistas para uma parte significativa
+   dos utilizadores. */
+const VELOCIDADE_PE = 0.9;
+
+/* Acima deste tempo a pé, vale a pena sugerir autocarro. */
+const LIMITE_A_PE = 12;   // minutos
+
+const MAPA = {
+
+  // Traçado das ruas, apenas contexto visual
+  ruas: [
+    "M 0 300 H 1000",
+    "M 0 620 H 1000",
+    "M 300 0 V 880",
+    "M 720 0 V 880",
+    "M 300 460 H 720"
+  ],
+
+  // Percursos das linhas. O id é usado para posicionar os veículos.
+  rotas: [
+    { linha: "2",  cor: "#378ADD", d: "M 60 300 H 300 V 460 H 720 V 300 H 960" },
+    { linha: "88", cor: "#1D9E75", d: "M 300 40 V 620 H 960" },
+    { linha: "42", cor: "#D85A30", d: "M 60 620 H 720 V 40" }
+  ],
+
+  paragens: [
+    { nome: "Hospital de Braga", x: 500, y: 460, atual: true,  linhas: "2 · 13 · 42 · 88" },
+    { nome: "Sequeira",          x: 300, y: 300, atual: false, linhas: "2 · 88" },
+    { nome: "Escola Secundária", x: 720, y: 620, atual: false, linhas: "42 · 88" },
+    { nome: "Praça do Mercado",  x: 300, y: 620, atual: false, linhas: "42" },
+    { nome: "Av. Central",       x: 720, y: 300, atual: false, linhas: "2 · 13" }
+  ],
+
+  // Pontos de interesse, filtráveis. Curados à mão de propósito: importar
+  // tudo do OpenStreetMap enche o mapa de ruído e ninguém valida a qualidade.
+  // 'viagem' indica a linha e a paragem de saída para os destinos onde o
+  // autocarro compensa; sem ela, o painel só propõe percurso a pé.
+  pontos: [
+    { tipo: "farmacia",   nome: "Farmácia do Hospital", x: 415, y: 375 },
+    { tipo: "farmacia",   nome: "Farmácia Sequeira",    x: 205, y: 545 },
+    { tipo: "farmacia",   nome: "Farmácia Central",     x: 880, y: 150,
+      viagem: { linha: "2", paragem: "Av. Central", aPe: 180 } },
+    { tipo: "multibanco", nome: "Multibanco · átrio",   x: 585, y: 375 },
+    { tipo: "multibanco", nome: "Multibanco · Central", x: 860, y: 720,
+      viagem: { linha: "88", paragem: "Escola Secundária", aPe: 140 } },
+    { tipo: "taxi",       nome: "Praça de táxis",       x: 620, y: 545 }
+  ]
+};
+
+const TIPOS_PONTO = {
+  farmacia:   { rotulo: "Farmácias",  rotuloEN: "Pharmacies", cor: "#34D399" },
+  multibanco: { rotulo: "Multibanco", rotuloEN: "Cash points", cor: "#FBBF24" },
+  taxi:       { rotulo: "Táxis",      rotuloEN: "Taxis",       cor: "#C4B5FD" }
+};
+
+/* Veículos em circulação. Na versão real vêm das VehiclePositions do
+   GTFS-RT; aqui o progresso ao longo do percurso avança sozinho.
+   progresso: 0 = início do traçado, 1 = fim. */
+let VEICULOS = [
+  { linha: "2",  rota: 0, progresso: 0.12, velocidade:  0.0016 },
+  { linha: "2",  rota: 0, progresso: 0.68, velocidade: -0.0013 },
+  { linha: "88", rota: 1, progresso: 0.40, velocidade:  0.0011 },
+  { linha: "42", rota: 2, progresso: 0.75, velocidade: -0.0018 }
+];
+
+/* Identificação técnica do equipamento. Serve o técnico em campo, não o
+   passageiro — por isso vive no ecrã institucional, em corpo pequeno.
+   Na versão real estes valores vêm do backend na sincronização. */
+const SISTEMA = {
+  equipamento:  "MUPI-HB-01",
+  versao:       "1.4.2",
+  atualizadoEm: "2026-07-14"      // última atualização remota de software
+};
+
+/* Ecossistema digital: o QR aponta sempre para o mesmo destino, portanto
+   é gerado uma vez e guardado como SVG. Não precisa de rede nem de
+   biblioteca. Se o endereço mudar, gera-se outro e substitui-se.
+   Sugestão: usar um endereço com marcação de origem (ex.: ?src=mupi-hospital)
+   para conseguir medir quantas instalações vieram do equipamento. */
+const APP_TUB = {
+  url: "https://www.tub.pt/app",
+  titulo:    "Leve os horários consigo",
+  tituloEN:  "Take the timetables with you",
+  texto:     "Aponte a câmara para descarregar a aplicação TUB",
+  textoEN:   "Point your camera to download the TUB app"
+};
+
+/* Ícones vetoriais em linha. Traço uniforme de 3, extremidades
+   arredondadas, sem preenchimento: lêem-se como um conjunto e escalam
+   sem perder qualidade. Substituíveis por SVG do manual de marca. */
+const ICONES = {
+
+  // Frontaria clássica — Braga Romana
+  arco: `<svg viewBox="0 0 120 120" fill="none" stroke="currentColor"
+      stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 46 60 16l50 30"/>
+      <path d="M6 46h108"/>
+      <path d="M26 56v46M47 56v46M73 56v46M94 56v46"/>
+      <path d="M6 104h108"/></svg>`,
+
+  // Título de transporte
+  passe: `<svg viewBox="0 0 140 100" fill="none" stroke="currentColor"
+      stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 20h120v20a10 10 0 0 0 0 20v20H10V60a10 10 0 0 0 0-20V20z"/>
+      <path d="M70 28v8M70 46v8M70 64v8" stroke-dasharray="0 0"/>
+      <path d="M26 44h26M26 58h18"/></svg>`,
+
+  // Telemóvel com um esboço do ecrã inicial da aplicação
+  telemovel: `<svg viewBox="0 0 120 210" fill="none" stroke="currentColor"
+      stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="12" y="6" width="96" height="198" rx="16"/>
+      <path d="M50 20h20"/>
+      <rect x="26" y="40" width="68" height="28" rx="6"/>
+      <path d="M26 88h68M26 106h44M26 124h68M26 142h52"/>
+      <rect x="26" y="164" width="68" height="22" rx="11"/></svg>`,
+
+  // Mão a tocar num ponto — convite à interação
+  toque: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 11.4V5.4a1.5 1.5 0 0 1 3 0v5.1"/>
+      <path d="M12 10.4V9a1.5 1.5 0 0 1 3 0v1.5"/>
+      <path d="M15 10.4v-.6a1.5 1.5 0 0 1 3 0V16a5 5 0 0 1-5 5h-1.1a5 5 0 0 1-3.9-1.86l-2.7-3.3a1.5 1.5 0 0 1 2.28-1.95L9 15.4"/></svg>`,
+
+  // Navegação
+  relogio: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></svg>`,
+
+  bilhete: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7h18v3.2a1.8 1.8 0 0 0 0 3.6V17H3v-3.2a1.8 1.8 0 0 0 0-3.6V7z"/>
+      <path d="M12 10v1M12 13v1"/></svg>`,
+
+  mapa: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/>
+      <path d="M9 4v13M15 6.5v13"/></svg>`,
+
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/>
+      <path d="M12 7.6h.01"/></svg>`,
+  // Acessibilidade e estados
+  olho: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/>
+      <circle cx="12" cy="12" r="2.8"/></svg>`,
+
+  altura: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4v14M7.5 13.5 12 18l4.5-4.5"/><path d="M5 21h14"/></svg>`,
+
+  idioma: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>
+      <path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></svg>`,
+
+  acessivel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="4.2" r="1.8"/>
+      <path d="M12 8v5h4.5"/>
+      <path d="M16 13a5 5 0 1 1-6.6 6"/></svg>`,
+
+  alerta: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4 2.5 20h19L12 4z"/><path d="M12 10v4.5"/>
+      <path d="M12 17.4h.01"/></svg>`,
+
+  antena: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="2"/>
+      <path d="M8.4 8.4a5 5 0 0 0 0 7.2M15.6 8.4a5 5 0 0 1 0 7.2"/>
+      <path d="M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>`,
+
+  ferramenta: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14.5 5.5a4.5 4.5 0 0 0 5.8 5.8l-8.6 8.6a2.4 2.4 0 0 1-3.4-3.4l8.6-8.6a4.5 4.5 0 0 0-2.4-2.4z"/></svg>`,
+
+  pino: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21s7-6.3 7-11.2A7 7 0 0 0 5 9.8C5 14.7 12 21 12 21z"/>
+      <circle cx="12" cy="9.8" r="2.6"/></svg>`,
+
+  seta: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5M11 6l-6 6 6 6"/></svg>`,
+
+  // Produtos anunciados
+  cafe: `<svg viewBox="0 0 120 120" fill="none" stroke="currentColor"
+      stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 46h64v30a24 24 0 0 1-24 24H44a24 24 0 0 1-24-24V46z"/>
+      <path d="M84 56h9a13 13 0 0 1 0 26h-9"/>
+      <path d="M40 18c0 7 6 7 6 14M58 14c0 8 7 8 7 16M76 20c0 6 5 6 5 12"/>
+      <path d="M14 110h76"/></svg>`,
+
+  tenis: `<svg viewBox="0 0 140 90" fill="none" stroke="currentColor"
+      stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 60V32a5 5 0 0 1 5-5h13l11 13 23 10 29 6c15 3 23 8 23 17v5a5 5 0 0 1-5 5H15a5 5 0 0 1-5-5v-8z"/>
+      <path d="M10 60h104"/>
+      <path d="m39 43-9 9M52 49l-9 9M65 55l-9 9"/></svg>`,
+
+  cabaz: `<svg viewBox="0 0 120 110" fill="none" stroke="currentColor"
+      stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 38h100l-11 58a9 9 0 0 1-9 7H30a9 9 0 0 1-9-7L10 38z"/>
+      <path d="M38 38 52 8M82 38 68 8"/>
+      <path d="M44 58v26M60 58v26M76 58v26"/></svg>`,
+
+  // Percurso a pé
+  passos: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="13" cy="4" r="1.8"/>
+      <path d="M11.5 21 9 15l3-2.4V8.6l-3 1.4-1.6 3"/>
+      <path d="M12 12.6 15 15l1.4 6"/>
+      <path d="m12 8.6 3.4 1.2 2.6-1.6"/></svg>`
+};
+
+/* Publicidade comercial. Marcas fictícias, de propósito: servem para
+   validar o desenho com criativos que não são dos TUB, que é o cenário
+   real de um suporte vendido a anunciantes.
+
+   Cada criativo traz o seu próprio fundo — na versão final é uma imagem
+   ou vídeo entregue pelo anunciante, e o equipamento não controla o que
+   lá vem. Daí a faixa de chegadas e o convite ao toque estarem sempre
+   em contraste alto, independentes do que estiver por trás. */
+const CAMPANHAS = [
+  { marca: "Aurora", titulo: "Café de origem",
+    legenda: "Torrado em Braga, todas as semanas",
+    icone: ICONES.cafe,  fundo: "#2E1F16", cor: "#E8C89B" },
+
+  { marca: "Nordika", titulo: "Nova coleção",
+    legenda: "Corra mais longe. Desconto de 30% até domingo",
+    icone: ICONES.tenis, fundo: "#12293F", cor: "#85B7EB" },
+
+  { marca: "Mercado Fresco", titulo: "Fruta da época",
+    legenda: "Dos produtores do Minho, todos os dias",
+    icone: ICONES.cabaz, fundo: "#17361B", cor: "#C0DD97" }
+];
+
+
+/* ============================================================
+   [3] ESTADO
+   Máquina de estados com os seis estados do descritivo.
+   Um único objeto guarda tudo o que o interface precisa.
+   ============================================================ */
+
+const ESTADOS = {
+  INATIVO:    "inativo",      // publicidade
+  ATIVO:      "ativo",        // passageiro a interagir
+  PRIORIDADE: "prioridade",   // aviso sobreposto, ocupa o ecrã
+  LEVANTADA:  "levantada",    // aviso lido: interface normal + faixa vermelha
+  DEGRADADO:  "degradado",    // sem tempo real
+  OFFLINE:    "offline",      // sem conectividade
+  MANUTENCAO: "manutencao"
+};
+
+const app = {
+  estado: ESTADOS.INATIVO,
+  ecra: "inicio",          // inicio | horarios | tarifario | mapa | info
+  linhaAberta: "2",
+  idioma: "pt",
+  contraste: false,
+  alturaReduzida: false,
+  campanha: 0,
+  ultimaSinc: new Date(),
+  filtros: { farmacia: true, multibanco: false, taxi: false },
+  pontoAberto: null,
+
+  /* O aviso em vigor vem do centro de controlo. Se já foi lido pelo
+     passageiro que está aqui agora, isso lê-se no estado LEVANTADA —
+     não precisa de variável própria. */
+  avisoAtivo: false,
+  dispensadoEm: 0,
+  ultimoToque: 0
+};
+
+// Temporizadores de inatividade — dois passos, como discutido
+/* Tempos de inatividade. Alargados face ao habitual (30–45 s) por causa do
+   público desta paragem: hospital, com muitos utentes idosos ou com
+   mobilidade reduzida, que leem e navegam mais devagar. Confirmar por
+   observação no local antes de fixar. */
+const TEMPO_VOLTA_INICIO = 90000;  // 90 s sem toque → volta ao ecrã inicial
+const TEMPO_PUBLICIDADE  = 45000;  // +45 s → volta à publicidade
+let tVoltaInicio, tPublicidade;
+
+/* Reaparecimento do aviso dispensado.
+   O aviso volta a ecrã cheio quando chega um passageiro novo — ou seja,
+   quando o equipamento acorda da publicidade. Enquanto a mesma pessoa está
+   a usá-lo, fica no vermelho da zona de avisos e não volta a interromper:
+   já foi lido.
+
+   TEMPO_REAPARECER volta a ativar a insistência por tempo. Deixado a 0
+   porque, na prática, o regresso à publicidade já chega para renovar. */
+const TEMPO_REAPARECER = 0;        // 0 = desligado; ex.: 45000 para 45 s
+const MARGEM_INTERACAO = 12000;    // nunca interromper a menos de 12 s de um toque
+const MARGEM_MESMA_PESSOA = 25000; // acordar tão depressa é a mesma pessoa
+let tReaparecer;
+
+function agendarReaparecimento() {
+  clearTimeout(tReaparecer);
+  if (!TEMPO_REAPARECER) return;
+  tReaparecer = setTimeout(() => {
+    if (app.estado !== ESTADOS.LEVANTADA) return;
+    if (Date.now() - app.ultimoToque < MARGEM_INTERACAO) {
+      agendarReaparecimento();     // alguém está a mexer: adia
+      return;
+    }
+    irPara(ESTADOS.PRIORIDADE);
+  }, TEMPO_REAPARECER);
+}
+
+function reiniciarInatividade() {
+  clearTimeout(tVoltaInicio);
+  clearTimeout(tPublicidade);
+  tVoltaInicio = setTimeout(() => {
+    app.ecra = "inicio";
+    desenhar();
+    tPublicidade = setTimeout(() => irPara(ESTADOS.INATIVO), TEMPO_PUBLICIDADE);
+  }, TEMPO_VOLTA_INICIO);
+}
+
+function irPara(novoEstado) {
+  app.estado = novoEstado;
+
+  // Entrar em qualquer um dos dois estados de aviso implica que há aviso
+  // em vigor — permite forçá-los pelo painel de desenvolvimento.
+  if (novoEstado === ESTADOS.PRIORIDADE || novoEstado === ESTADOS.LEVANTADA) {
+    app.avisoAtivo = true;
+  }
+
+  if (novoEstado === ESTADOS.INATIVO) {
+    clearTimeout(tVoltaInicio);
+    clearTimeout(tPublicidade);
+    clearTimeout(tReaparecer);
+    app.ecra = "inicio";
+  } else {
+    reiniciarInatividade();
+  }
+  desenhar();
+}
+
+// Qualquer toque acorda o equipamento e interrompe a publicidade.
+// Sobre um aviso prioritário, o toque levanta-o: a interface volta ao
+// normal e o aviso passa a faixa vermelha. Informa, não bloqueia.
+function aoTocar() {
+  app.ultimoToque = Date.now();
+
+  if (app.estado === ESTADOS.INATIVO) {
+    if (!app.avisoAtivo) { irPara(ESTADOS.ATIVO); return; }
+    // Acordar poucos segundos depois de levantar o aviso é a mesma
+    // pessoa a voltar — não se lhe repete o ecrã cheio.
+    const mesmaPessoa = Date.now() - app.dispensadoEm < MARGEM_MESMA_PESSOA;
+    irPara(mesmaPessoa ? ESTADOS.LEVANTADA : ESTADOS.PRIORIDADE);
+
+  } else if (app.estado === ESTADOS.PRIORIDADE) {
+    app.dispensadoEm = Date.now();
+    agendarReaparecimento();
+    irPara(ESTADOS.LEVANTADA);
+
+  } else if (app.estado !== ESTADOS.MANUTENCAO) {
+    reiniciarInatividade();
+  }
+}
+
+
+/* ============================================================
+   [4] ECRÃS
+   Cada função devolve uma string de HTML. Trocar por
+   componentes React mais tarde é um mapeamento direto.
+   ============================================================ */
+
+const t = (pt, en) => app.idioma === "pt" ? pt : en;
+
+function cabecalho() {
+  const agora = new Date();
+  const hora = agora.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  const data = agora.toLocaleDateString(t("pt-PT","en-GB"), { weekday: "long", day: "numeric", month: "long" });
+  return `
+    <header class="cabecalho">
+      <div class="marca">
+        <div class="marca-logo">T<span>U</span>B</div>
+        <div class="paragem">${t(PARAGEM.nome, PARAGEM.nomeEN)}</div>
+      </div>
+      <div class="relogio">
+        <div class="relogio-hora">${hora}</div>
+        <div class="relogio-data">${data}</div>
+      </div>
+    </header>`;
+}
+
+function chegada(c, teorico) {
+  const perto = c.eta <= 5 && !teorico;
+  const nota = teorico
+    ? t("horário planeado", "scheduled")
+    : c.atraso > 0
+      ? t(`atraso de ${c.atraso} min`, `${c.atraso} min delay`)
+      : c.tempoReal ? "" : t("horário planeado", "scheduled");
+  return `
+    <div class="chegada">
+      <div class="linha-chip">${c.linha}</div>
+      <div class="chegada-info">
+        <div class="chegada-destino">${t(c.destino, c.destinoEN)}</div>
+        <div class="chegada-nota ${c.atraso > 0 && !teorico ? "atraso" : ""}">
+          ${c.acessivel ? `<span class="nota-icone">${ICONES.acessivel}</span>` : ""}${nota}
+        </div>
+      </div>
+      <div class="chegada-eta ${perto ? "perto" : ""} ${teorico ? "teorico" : ""}">
+        ${teorico ? horaDaqui(c.eta) : `${c.eta}<small> min</small>`}
+      </div>
+    </div>`;
+}
+
+function horaDaqui(minutos) {
+  const d = new Date(Date.now() + minutos * 60000);
+  return d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+}
+
+/* QR estático da aplicação móvel. O SVG está embebido de propósito:
+   funciona sem rede, que é requisito num equipamento de rua. */
+/* Frescura dos dados. Não é um relógio a contar: mostra a hora da última
+   sincronização e muda de cor quando a informação envelhece. Enquanto tudo
+   corre bem passa despercebido; quando falha, dá-se a ver. */
+function frescura() {
+  const segundos = Math.round((Date.now() - app.ultimaSinc) / 1000);
+  const hora = app.ultimaSinc.toLocaleTimeString("pt-PT",
+                 { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return {
+    classe: segundos > 120 ? "velho" : "",
+    texto:  t(`Última atualização: ${hora}`, `Last updated: ${hora}`)
+  };
+}
+
+function qrCodigoSVG() {
+  return `<svg viewBox="0 0 33 33" class="qr-codigo" role="img" aria-label="Código QR para descarregar a aplicação TUB"><path fill="#fff" d="M0 0h33v33h-33z"/><path stroke="#0e1621" d="M2 2.5h7m3 0h2m6 0h1m3 0h7m-29 1h1m5 0h1m2 0h7m2 0h1m1 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m1 0h4m3 0h2m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m2 0h2m3 0h5m1 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h3m4 0h1m3 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m5 0h1m1 0h1m2 0h4m1 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-21 1h3m1 0h2m5 0h1m-18 1h2m2 0h5m2 0h2m3 0h2m1 0h2m1 0h1m-25 1h1m3 0h2m2 0h1m1 0h5m1 0h3m2 0h2m1 0h2m2 0h1m-29 1h2m1 0h1m1 0h2m3 0h1m1 0h1m1 0h3m3 0h1m1 0h2m1 0h3m-21 1h1m1 0h1m1 0h1m3 0h1m3 0h1m3 0h1m4 0h1m-27 1h1m1 0h1m1 0h1m4 0h3m4 0h1m1 0h2m1 0h1m2 0h3m-27 1h2m3 0h1m1 0h1m1 0h1m1 0h3m3 0h1m2 0h2m1 0h4m-29 1h2m3 0h2m5 0h1m1 0h1m3 0h4m1 0h3m1 0h2m-25 1h2m1 0h1m1 0h1m1 0h2m1 0h1m1 0h2m1 0h2m1 0h1m1 0h2m1 0h1m-28 1h8m3 0h1m3 0h1m1 0h1m3 0h1m2 0h2m1 0h1m-26 1h2m3 0h1m1 0h4m1 0h4m2 0h1m2 0h1m1 0h1m-26 1h1m1 0h2m2 0h1m3 0h1m1 0h2m1 0h1m1 0h2m3 0h1m1 0h1m1 0h1m-22 1h1m1 0h4m1 0h2m2 0h2m2 0h4m2 0h1m1 0h1m-28 1h2m2 0h2m1 0h1m5 0h1m3 0h11m-21 1h2m1 0h1m5 0h1m1 0h2m3 0h2m2 0h1m-29 1h7m1 0h3m1 0h2m1 0h3m1 0h2m1 0h1m1 0h1m1 0h2m-28 1h1m5 0h1m2 0h2m2 0h5m2 0h1m3 0h1m-25 1h1m1 0h3m1 0h1m2 0h2m1 0h1m5 0h1m1 0h7m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h2m3 0h1m4 0h2m1 0h1m-28 1h1m1 0h3m1 0h1m1 0h1m4 0h1m1 0h2m1 0h1m1 0h1m2 0h1m1 0h2m1 0h1m-29 1h1m5 0h1m3 0h1m1 0h1m6 0h3m2 0h2m1 0h1m-28 1h7m2 0h1m4 0h2m2 0h4m1 0h1m1 0h1m1 0h1"/></svg>`;
+}
+
+function qrApp(destaque = false) {
+  return `
+    <div class="qr-cartao ${destaque ? "destaque" : ""}">
+      <div class="qr-moldura">${qrCodigoSVG()}</div>
+      <div class="qr-texto">
+        <h3>${t(APP_TUB.titulo, APP_TUB.tituloEN)}</h3>
+        <p>${t(APP_TUB.texto, APP_TUB.textoEN)}</p>
+        <div class="qr-lojas">App Store · Google Play</div>
+      </div>
+    </div>`;
+}
+
+function navegacao() {
+  const itens = [
+    { id: "horarios",  icone: ICONES.relogio, pt: "Horários",  en: "Timetables" },
+    { id: "tarifario", icone: ICONES.bilhete, pt: "Tarifário", en: "Fares" },
+    { id: "mapa",      icone: ICONES.mapa,    pt: "Mapa",      en: "Map" },
+    { id: "info",      icone: ICONES.info,    pt: "Info",      en: "Info" }
+  ];
+  return `
+    <nav class="navegacao">
+      ${itens.map(i => `
+        <button class="nav-botao ${app.ecra === i.id ? "ativo" : ""}" data-ecra="${i.id}">
+          <span class="nav-icone">${i.icone}</span>
+          <span>${t(i.pt, i.en)}</span>
+        </button>`).join("")}
+    </nav>
+    <div class="barra-acess">
+      <button class="acess-botao" data-acao="contraste" aria-pressed="${app.contraste}">
+        <span class="acess-icone">${ICONES.olho}</span> ${t("Alto contraste", "High contrast")}
+      </button>
+      <button class="acess-botao" data-acao="altura" aria-pressed="${app.alturaReduzida}">
+        <span class="acess-icone">${ICONES.altura}</span> ${t("Altura reduzida", "Lower height")}
+      </button>
+      <button class="acess-botao" data-acao="idioma">
+        <span class="acess-icone">${ICONES.idioma}</span> ${app.idioma === "pt" ? "English" : "Português"}
+      </button>
+    </div>`;
+}
+
+/* --- Ecrã inicial: próximas chegadas --- */
+function ecraInicio(teorico = false) {
+  return `
+    <div class="corpo">
+      <div class="seccao-titulo">
+        <h2>${t("Próximas chegadas", "Next arrivals")}</h2>
+        ${teorico ? "" : (() => {
+          const f = frescura();
+          return `<span class="pulso ${f.classe}">${f.texto}</span>`;
+        })()}
+      </div>
+      <div class="chegadas">
+        ${CHEGADAS.slice(0, 4).map(c => chegada(c, teorico)).join("")}
+      </div>
+      ${faixaAvisos()}
+      ${qrApp()}
+    </div>`;
+}
+
+/* --- Horários --- */
+function ecraHorarios() {
+  const agora = new Date();
+  const horaAtual = agora.getHours() * 60 + agora.getMinutes();
+  const linhas = Object.keys(HORARIOS);
+  return `
+    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span> ${t("Voltar", "Back")}</button>
+    <div class="conteudo">
+      <div class="cartao">
+        <h3>${t("Escolha a linha", "Choose a route")}</h3>
+        <div style="display:flex; gap:var(--e2); margin-top:var(--e3)">
+          ${linhas.map(l => `
+            <button class="nav-botao ${app.linhaAberta === l ? "ativo" : ""}"
+                    style="min-height:120px; flex:1" data-linha="${l}">
+              <span class="nav-icone">${l}</span>
+            </button>`).join("")}
+        </div>
+      </div>
+      <div class="cartao">
+        <h3>${t("Partidas de hoje", "Today's departures")} · ${t("linha","route")} ${app.linhaAberta}</h3>
+        <div class="horas" style="margin-top:var(--e3)">
+          ${HORARIOS[app.linhaAberta].map(h => {
+            const [hh, mm] = h.split(":").map(Number);
+            const passou = hh * 60 + mm < horaAtual;
+            return `<span class="${passou ? "passou" : ""}">${h}</span>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* --- Tarifário --- */
+function ecraTarifario() {
+  return `
+    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span> ${t("Voltar", "Back")}</button>
+    <div class="conteudo">
+      <div class="cartao">
+        <h3>${t("Títulos de transporte", "Fares")}</h3>
+        <table class="tabela" style="margin-top:var(--e3)">
+          ${TARIFARIO.map(x => `<tr><td>${x.titulo}</td><td>${x.preco}</td></tr>`).join("")}
+        </table>
+      </div>
+      <div class="cartao">
+        <h3>${t("Onde comprar", "Where to buy")}</h3>
+        <p>${t(
+          "A bordo, nas lojas TUB, em agentes aderentes ou na aplicação móvel.",
+          "On board, at TUB stores, partner agents or the mobile app."
+        )}</p>
+      </div>
+    </div>`;
+}
+
+/* --- Mapa --- */
+/* --- Como chegar a um ponto de interesse ---
+   Decide entre percurso a pé e viagem de autocarro em função da distância.
+   Sugerir autocarro para 300 m é mau conselho; omiti-lo para 1 km também.
+   Com cartografia real, o cálculo passaria a um serviço de routing. */
+function comoChegar(p) {
+  const paragem = MAPA.paragens.find(x => x.atual);
+  const dx = (p.x - paragem.x) * ESCALA_MAPA;
+  const dy = (p.y - paragem.y) * ESCALA_MAPA;
+  const metros = Math.round(Math.hypot(dx, dy) * SINUOSIDADE);
+  const minutos = Math.max(1, Math.round(metros / VELOCIDADE_PE / 60));
+
+  // Sem autocarro que sirva, ou perto o suficiente: vai-se a pé.
+  if (!p.viagem || minutos <= LIMITE_A_PE) {
+    return { modo: "pe", metros, minutos };
+  }
+
+  // Próxima passagem da linha indicada, a partir das chegadas em tempo real.
+  const proxima = CHEGADAS.find(c => c.linha === p.viagem.linha);
+  const minutosFinais = Math.max(1, Math.round(p.viagem.aPe / VELOCIDADE_PE / 60));
+
+  return {
+    modo: "autocarro",
+    metros, minutos,
+    linha: p.viagem.linha,
+    paragemSaida: p.viagem.paragem,
+    esperaMin: proxima ? proxima.eta : null,
+    aPeFinalMin: minutosFinais,
+    aPeFinalM: p.viagem.aPe
+  };
+}
+
+function painelPonto() {
+  if (app.pontoAberto === null) return "";
+  const p = MAPA.pontos[app.pontoAberto];
+  if (!p) return "";
+  const r = comoChegar(p);
+  const cor = TIPOS_PONTO[p.tipo].cor;
+
+  const corpo = r.modo === "pe"
+    ? `
+      <div class="passo">
+        <span class="passo-icone" style="color:${cor}">${ICONES.passos}</span>
+        <div>
+          <div class="passo-titulo">${t("A pé", "On foot")} · ${r.minutos} min</div>
+          <div class="passo-nota">${r.metros} ${t("metros a partir desta paragem",
+                                                  "metres from this stop")}</div>
+        </div>
+      </div>
+      <p class="painel-nota">${t(
+        "A esta distância não compensa esperar pelo autocarro.",
+        "At this distance it is not worth waiting for the bus.")}</p>`
+    : `
+      <div class="passo">
+        <span class="passo-numero">1</span>
+        <div>
+          <div class="passo-titulo">
+            ${t("Apanhe a linha", "Take route")}
+            <span class="linha-chip pequeno">${r.linha}</span>
+          </div>
+          <div class="passo-nota">${r.esperaMin !== null
+            ? t(`Parte desta paragem dentro de ${r.esperaMin} min`,
+                `Departs from this stop in ${r.esperaMin} min`)
+            : t("Consulte os horários", "Check the timetables")}</div>
+        </div>
+      </div>
+      <div class="passo">
+        <span class="passo-numero">2</span>
+        <div>
+          <div class="passo-titulo">${t("Saia em", "Get off at")} ${r.paragemSaida}</div>
+        </div>
+      </div>
+      <div class="passo">
+        <span class="passo-numero">3</span>
+        <div>
+          <div class="passo-titulo">${t("A pé", "On foot")} · ${r.aPeFinalMin} min</div>
+          <div class="passo-nota">${r.aPeFinalM} ${t("metros até ao destino",
+                                                     "metres to the destination")}</div>
+        </div>
+      </div>
+      <p class="painel-nota">${t(
+        `A pé desde aqui seriam cerca de ${r.minutos} min.`,
+        `Walking all the way would take about ${r.minutos} min.`)}</p>`;
+
+  return `
+    <div class="ponto-painel">
+      <div class="ponto-painel-topo">
+        <span class="ponto-painel-marca" style="background:${cor}"></span>
+        <div class="ponto-painel-nome">${p.nome}</div>
+        <button class="ponto-fechar" data-acao="fechar-ponto"
+                aria-label="${t("Fechar", "Close")}">×</button>
+      </div>
+      <div class="ponto-painel-corpo">${corpo}</div>
+    </div>`;
+}
+
+function ecraMapa() {
+  const filtros = Object.entries(TIPOS_PONTO).map(([tipo, cfg]) => `
+    <button class="filtro ${app.filtros[tipo] ? "ligado" : ""}" data-filtro="${tipo}">
+      <span class="filtro-ponto" style="background:${cfg.cor}"></span>
+      ${t(cfg.rotulo, cfg.rotuloEN)}
+    </button>`).join("");
+
+  return `
+    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span>
+      ${t("Voltar", "Back")}</button>
+
+    <div class="mapa-filtros">${filtros}</div>
+
+    <div class="mapa-caixa">
+      <svg id="mapa-svg" viewBox="0 0 1000 880" class="mapa-svg">
+
+        ${MAPA.ruas.map(d => `<path d="${d}" class="rua"/>`).join("")}
+
+        ${MAPA.rotas.map((r, i) =>
+          `<path id="rota-${i}" d="${r.d}" class="rota" stroke="${r.cor}"/>`).join("")}
+
+        ${MAPA.pontos.map((p, i) => !app.filtros[p.tipo] ? "" : `
+          <g class="ponto ${app.pontoAberto === i ? "aberto" : ""}" data-ponto="${i}">
+            <circle cx="${p.x}" cy="${p.y}" r="48" fill="transparent"/>
+            <circle cx="${p.x}" cy="${p.y}" r="${app.pontoAberto === i ? 24 : 17}"
+                    fill="${TIPOS_PONTO[p.tipo].cor}" stroke="#0E1621" stroke-width="4"/>
+            <text x="${p.x}" y="${p.y + 50}" class="ponto-nome">${p.nome}</text>
+          </g>`).join("")}
+
+        ${MAPA.paragens.map(p => `
+          <g class="paragem">
+            ${p.atual ? `<circle cx="${p.x}" cy="${p.y}" r="42" class="halo"/>` : ""}
+            <circle cx="${p.x}" cy="${p.y}" r="${p.atual ? 24 : 15}"
+                    fill="${p.atual ? "#E30613" : "#0E1621"}"
+                    stroke="#FFFFFF" stroke-width="5"/>
+            <text x="${p.x}" y="${p.y - (p.atual ? 60 : 34)}"
+                  class="paragem-nome ${p.atual ? "atual" : ""}">${p.nome}</text>
+            <text x="${p.x}" y="${p.y - (p.atual ? 26 : 34) + 34}"
+                  class="paragem-linhas">${p.atual ? "" : p.linhas}</text>
+          </g>`).join("")}
+
+        ${VEICULOS.map((v, i) => `
+          <g id="veiculo-${i}" class="veiculo">
+            <rect x="-38" y="-23" width="76" height="46" rx="10"
+                  fill="${MAPA.rotas[v.rota].cor}" stroke="#0E1621" stroke-width="4"/>
+            <text x="0" y="9" class="veiculo-linha">${v.linha}</text>
+          </g>`).join("")}
+      </svg>
+      ${painelPonto()}
+    </div>
+
+    <div class="mapa-legenda">
+      <span class="legenda-item">
+        <span class="legenda-marca aqui"></span>${t("Está aqui", "You are here")}
+      </span>
+      <span class="legenda-item">
+        <span class="legenda-marca bus"></span>${t("Autocarro em circulação", "Bus in service")}
+      </span>
+      <span class="legenda-item">
+        <span class="legenda-marca paragem"></span>${t("Outras paragens", "Other stops")}
+      </span>
+    </div>`;
+}
+
+/* --- Informação institucional --- */
+function ecraInfo() {
+  return `
+    <button class="voltar" data-ecra="inicio"><span class="voltar-icone">${ICONES.seta}</span> ${t("Voltar", "Back")}</button>
+    <div class="conteudo">
+      <div class="cartao">
+        <h3>${t("Contactos", "Contacts")}</h3>
+        <table class="tabela" style="margin-top:var(--e2)">
+          <tr><td>${t("Apoio ao cliente", "Customer support")}</td><td>253 000 000</td></tr>
+          <tr><td>${t("Objetos perdidos", "Lost and found")}</td><td>253 000 001</td></tr>
+          <tr><td>Website</td><td>tub.pt</td></tr>
+        </table>
+      </div>
+      <div class="cartao">
+        <h3>${t("Acessibilidade", "Accessibility")}</h3>
+        <p>${t(
+          "Os veículos assinalados dispõem de piso rebaixado e lugar reservado.",
+          "Vehicles marked have a low floor and a reserved space."
+        )}</p>
+      </div>
+      <div class="cartao">
+        <h3 style="text-align:center; margin-bottom:var(--e3)">
+          ${t("Aplicação TUB", "TUB app")}
+        </h3>
+        ${qrApp(true)}
+      </div>
+      <div class="cartao">
+        <h3>${t("Esta paragem", "This stop")}</h3>
+        <table class="tabela" style="margin-top:var(--e2)">
+          <tr><td>${t("Código", "Code")}</td><td>${PARAGEM.id}</td></tr>
+          <tr><td>${t("Linhas", "Routes")}</td><td>2 · 13 · 42 · 88</td></tr>
+        </table>
+      </div>
+      <div class="rodape-tecnico">
+        ${SISTEMA.equipamento} ·
+        ${t("versão", "version")} ${SISTEMA.versao} ·
+        ${t("atualizado a", "updated")} ${SISTEMA.atualizadoEm} ·
+        ${t("sincronizado às", "synced at")}
+        ${app.ultimaSinc.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+      </div>
+    </div>`;
+}
+
+/* --- Estado inativo: publicidade com faixa persistente --- */
+function ecraPublicidade() {
+  const c = CAMPANHAS[app.campanha % CAMPANHAS.length];
+  return `
+    <div class="publicidade">
+      <div class="criativo" style="background:${c.fundo}; color:${c.cor}">
+        <span class="criativo-marcador">${t("Publicidade", "Advertisement")}</span>
+        <div class="criativo-icone">${c.icone}</div>
+        <div class="criativo-marca">${c.marca}</div>
+        <div class="criativo-titulo">${c.titulo}</div>
+        <div class="criativo-legenda">${c.legenda}</div>
+        <div class="toque">
+          <span class="toque-dedo">
+            <span class="toque-onda"></span>
+            <span class="toque-onda"></span>
+            ${ICONES.toque}
+          </span>
+          ${t("Toque em qualquer lugar para começar", "Touch anywhere to start")}
+        </div>
+      </div>
+      <div class="faixa-persistente">
+        ${CHEGADAS.slice(0, 2).map(x => `
+          <div class="faixa-linha">
+            <div class="linha-chip">${x.linha}</div>
+            <div class="destino">${t(x.destino, x.destinoEN)}</div>
+            <div class="eta" style="${x.eta <= 5 ? "color:var(--ok)" : ""}">${x.eta} min</div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+/* --- Estados de sistema --- */
+/* --- Degradado: há rede, não há posição dos autocarros ---
+   A informação estática continua toda válida, por isso a navegação
+   mantém-se completa. O que muda é a confiança nos tempos. */
+function ecraDegradado() {
+  return `
+    <div class="corpo">
+      <div class="aviso-estado">
+        <span class="aviso-estado-icone">${ICONES.antena}</span>
+        <div>
+          <h3>${t("Horários previstos", "Scheduled times")}</h3>
+          <p>${t(
+            "Sem ligação aos autocarros neste momento. As horas abaixo são as planeadas — o autocarro pode chegar antes ou depois.",
+            "No live connection to the vehicles. The times below are scheduled and may vary.")}</p>
+        </div>
+      </div>
+      <div class="seccao-titulo">
+        <h2>${t("Próximas partidas", "Next departures")}</h2>
+      </div>
+      <div class="chegadas">
+        ${CHEGADAS.slice(0, 4).map(c => chegada(c, true)).join("")}
+      </div>
+      ${faixaAvisos()}
+      ${qrApp()}
+    </div>`;
+}
+
+/* --- Offline: não chega nada, mostra-se o que ficou em cache ---
+   A hora da última receção é a informação mais importante do ecrã:
+   é o que permite ao passageiro decidir se ainda vale alguma coisa. */
+function ecraOffline() {
+  const sinc = app.ultimaSinc.toLocaleTimeString("pt-PT",
+                 { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return `
+    <div class="corpo">
+      <div class="aviso-estado">
+        <span class="aviso-estado-icone">${ICONES.antena}</span>
+        <div>
+          <h3>${t(`Última atualização foi às ${sinc}`,
+                  `Last updated at ${sinc}`)}</h3>
+          <p>${t(
+            "Este equipamento está sem ligação. Para horários atualizados, use a aplicação no seu telemóvel.",
+            "This unit is offline. For up-to-date times, please use the app on your phone.")}</p>
+        </div>
+      </div>
+      <div class="seccao-titulo">
+        <h2>${t("Última informação recebida", "Last information received")}</h2>
+      </div>
+      <div class="chegadas">
+        ${CHEGADAS.slice(0, 3).map(c => chegada(c, true)).join("")}
+      </div>
+      ${faixaAvisos()}
+      ${qrApp()}
+    </div>`;
+}
+
+/* --- Manutenção: intervenção deliberada, não avaria ---
+   Tom institucional e calmo. O ecrã não pede desculpa: diz o que se
+   passa e aponta três caminhos alternativos. */
+function ecraManutencao() {
+  return `
+    <div class="sistema">
+      <div class="sistema-icone">${ICONES.ferramenta}</div>
+      <h2>${t("Em manutenção", "Under maintenance")}</h2>
+      <p>${t(
+        "Este ponto de informação está temporariamente fora de serviço.<br>Consulte os horários por uma das vias abaixo.",
+        "This information point is temporarily out of service.<br>Please check timetables through one of the options below.")}</p>
+      <div class="alternativas">
+        <div class="alternativa">
+          <div class="qr-moldura">${qrCodigoSVG()}</div>
+          <strong style="font-size:var(--t-peq)">${t("Aplicação TUB", "TUB app")}</strong>
+          <span>${t("Aponte a câmara", "Point your camera")}</span>
+        </div>
+        <div class="alternativa">
+          <strong>tub.pt</strong>
+          <span>${t("Horários, tarifários e percursos", "Timetables, fares and routes")}</span>
+        </div>
+        <div class="alternativa">
+          <strong>253 000 000</strong>
+          <span>${t("Apoio ao cliente", "Customer support")}</span>
+        </div>
+      </div>
+      <div class="rodape-tecnico">${SISTEMA.equipamento} · ${SISTEMA.versao}</div>
+    </div>`;
+}
+
+/* Pilha de avisos, na zona habitual do ecrã. O prioritário já dispensado
+   entra em vermelho e no topo; os avisos correntes ficam em âmbar por baixo.
+   Tocar no vermelho reabre a sobreposição. */
+function faixaAvisos() {
+  let html = "";
+
+  if (app.estado === ESTADOS.LEVANTADA) {
+    html += `
+      <div class="faixa-aviso critico" data-acao="reabrir-aviso">
+        <span class="faixa-icone">${ICONES.alerta}</span>
+        <span class="faixa-aviso-texto">
+          <strong>${t(AVISO_PRIORITARIO.titulo, AVISO_PRIORITARIO.tituloEN)}:</strong>
+          ${t(AVISO_PRIORITARIO.texto, AVISO_PRIORITARIO.textoEN)}
+        </span>
+      </div>`;
+  }
+
+  const a = AVISOS[0];
+  if (a) {
+    html += `
+      <div class="faixa-aviso">
+        <span class="faixa-icone">${ICONES.alerta}</span>
+        <span class="faixa-aviso-texto">${t(a.texto, a.textoEN)}</span>
+      </div>`;
+  }
+  return html;
+}
+
+function sobreposicaoAviso() {
+  return `
+    <div class="sobreposicao">
+      <div class="aviso-painel">
+        <div class="icone">${ICONES.alerta}</div>
+        <h2>${t(AVISO_PRIORITARIO.titulo, AVISO_PRIORITARIO.tituloEN)}</h2>
+        <p>${t(AVISO_PRIORITARIO.texto, AVISO_PRIORITARIO.textoEN)}</p>
+      </div>
+      <div class="aviso-continuar">
+        <span class="toque-dedo">
+          <span class="toque-onda"></span>
+          <span class="toque-onda"></span>
+          ${ICONES.toque}
+        </span>
+        ${t("Toque para continuar", "Touch to continue")}
+      </div>
+    </div>`;
+}
+
+
+/* ============================================================
+   Composição: que ecrã mostrar em cada estado
+   ============================================================ */
+/* Coloca cada veículo no ponto correspondente do seu percurso. Usa a API
+   de geometria do SVG, por isso só corre depois do elemento estar no DOM.
+   Na versão real, o progresso é substituído pela posição vinda do GTFS-RT
+   projetada sobre o traçado da linha. */
+function posicionarVeiculos() {
+  const svg = document.getElementById("mapa-svg");
+  if (!svg) return;
+  VEICULOS.forEach((v, i) => {
+    const caminho = svg.querySelector(`#rota-${v.rota}`);
+    const marca   = svg.querySelector(`#veiculo-${i}`);
+    if (!caminho || !marca || !caminho.getTotalLength) return;
+    const ponto = caminho.getPointAtLength(v.progresso * caminho.getTotalLength());
+    marca.setAttribute("transform", `translate(${ponto.x}, ${ponto.y})`);
+  });
+}
+
+function desenhar() {
+  const palco = document.getElementById("palco");
+  let html = "";
+
+  switch (app.estado) {
+
+    case ESTADOS.INATIVO:
+      html = ecraPublicidade();
+      break;
+
+    case ESTADOS.MANUTENCAO:
+      html = cabecalho() + ecraManutencao();
+      break;
+
+    case ESTADOS.OFFLINE:
+      html = cabecalho() + ecraOffline() + navegacao();
+      break;
+
+    case ESTADOS.DEGRADADO:
+      html = cabecalho() + ecraDegradado() + navegacao();
+      break;
+
+    case ESTADOS.PRIORIDADE:
+      html = cabecalho() + ecraInicio() + navegacao() + sobreposicaoAviso();
+      break;
+
+    // Prioridade levantada: interface normal, com a faixa vermelha que
+    // faixaAvisos() acrescenta. Partilha tudo o resto com o estado ativo.
+    case ESTADOS.LEVANTADA:
+    case ESTADOS.ATIVO:
+    default:
+      const ecras = {
+        inicio:    () => ecraInicio(),
+        horarios:  ecraHorarios,
+        tarifario: ecraTarifario,
+        mapa:      ecraMapa,
+        info:      ecraInfo
+      };
+      html = cabecalho() + (ecras[app.ecra] || ecras.inicio)();
+      if (app.ecra === "inicio") html += navegacao();
+  }
+
+  palco.innerHTML = html;
+  document.body.classList.toggle("contraste", app.contraste);
+  posicionarVeiculos();
+  ajustarEscala();
+  atualizarDev();
+}
+
+
+/* ============================================================
+   [5] ARRANQUE
+   ============================================================ */
+
+/* Escala o palco de 1080×1920 para caber na janela.
+   O modo de altura reduzida desloca o conteúdo para baixo,
+   simulando o uso por quem está sentado. */
+function ajustarEscala() {
+  const palco = document.getElementById("palco");
+  const escala = Math.min(window.innerWidth / 1080, window.innerHeight / 1920) * 0.97;
+  const desvio = app.alturaReduzida ? 140 : 0;
+  palco.style.transform =
+    `translate(-50%, -50%) scale(${escala}) translateY(${desvio}px)`;
+}
+
+/* Delegação de eventos: um único listener trata todos os toques */
+document.addEventListener("click", e => {
+  aoTocar();
+
+  const alvo = e.target.closest("[data-ecra], [data-linha], [data-acao], [data-filtro], [data-ponto]");
+  if (!alvo) return;
+
+  if (alvo.dataset.ecra)  { app.ecra = alvo.dataset.ecra; app.pontoAberto = null; }
+  if (alvo.dataset.linha) { app.linhaAberta = alvo.dataset.linha; }
+  if (alvo.dataset.filtro) {
+    const f = alvo.dataset.filtro;
+    app.filtros[f] = !app.filtros[f];
+    app.pontoAberto = null;          // o ponto aberto pode deixar de existir
+  }
+  if (alvo.dataset.ponto !== undefined) {
+    const i = Number(alvo.dataset.ponto);
+    app.pontoAberto = app.pontoAberto === i ? null : i;   // segundo toque fecha
+  }
+
+  switch (alvo.dataset.acao) {
+    case "contraste": app.contraste = !app.contraste; break;
+    case "altura":    app.alturaReduzida = !app.alturaReduzida; break;
+    case "idioma":    app.idioma = app.idioma === "pt" ? "en" : "pt"; break;
+    case "aviso":
+      app.avisoAtivo = true;
+      irPara(ESTADOS.PRIORIDADE);
+      return;
+    case "limpar-aviso":
+      app.avisoAtivo = false;
+      clearTimeout(tReaparecer);
+      if (app.estado === ESTADOS.PRIORIDADE ||
+          app.estado === ESTADOS.LEVANTADA) irPara(ESTADOS.ATIVO);
+      break;
+    case "fechar-ponto":
+      app.pontoAberto = null;
+      break;
+    case "reabrir-aviso":
+      irPara(ESTADOS.PRIORIDADE);
+      return;
+  }
+  desenhar();
+});
+
+/* Relógio: redesenha o cabeçalho a cada minuto */
+setInterval(() => {
+  if (app.estado !== ESTADOS.INATIVO) desenhar();
+}, 60000);
+
+/* Simulação do polling do GTFS-RT (15–30 s no descritivo).
+   Substituir por fetch("/api/chegadas") na versão real. */
+setInterval(() => {
+  CHEGADAS = CHEGADAS
+    .map(c => ({ ...c, eta: c.eta - 1 }))
+    .filter(c => c.eta > 0);
+  if (CHEGADAS.length < 4) {
+    const base = CHEGADAS[CHEGADAS.length - 1] || { eta: 20 };
+    CHEGADAS.push({
+      linha: ["2","13","42","88"][Math.floor(Math.random() * 4)],
+      destino: "Universidade do Minho", destinoEN: "University of Minho",
+      eta: base.eta + 5 + Math.floor(Math.random() * 6),
+      tempoReal: true, acessivel: Math.random() > .4, atraso: 0
+    });
+  }
+  app.ultimaSinc = new Date();
+  desenhar();
+}, 20000);
+
+/* Avanço dos veículos. Só mexe quando o mapa está à vista — não vale a
+   pena gastar ciclos a animar o que ninguém vê. Invertem o sentido ao
+   chegar ao fim do percurso, simulando o retorno. */
+setInterval(() => {
+  if (app.ecra !== "mapa") return;
+  VEICULOS.forEach(v => {
+    v.progresso += v.velocidade;
+    if (v.progresso > 1) { v.progresso = 1; v.velocidade *= -1; }
+    if (v.progresso < 0) { v.progresso = 0; v.velocidade *= -1; }
+  });
+  posicionarVeiculos();
+}, 450);
+
+/* Rotação de campanhas no estado inativo */
+setInterval(() => {
+  if (app.estado === ESTADOS.INATIVO) { app.campanha++; desenhar(); }
+}, 8000);
+
+window.addEventListener("resize", ajustarEscala);
+
+/* ---------- Painel de desenvolvimento ---------- */
+document.addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "d") document.getElementById("dev").classList.toggle("aberto");
+});
+
+function atualizarDev() {
+  const cx = document.getElementById("dev-estados");
+  cx.innerHTML = Object.values(ESTADOS).map(s =>
+    `<button data-estado="${s}" class="${app.estado === s ? "on" : ""}">${s}</button>`
+  ).join("");
+  cx.querySelectorAll("button").forEach(b =>
+    b.onclick = ev => { ev.stopPropagation(); irPara(b.dataset.estado); });
+}
+
+desenhar();
+</script>
+</body>
+</html>
